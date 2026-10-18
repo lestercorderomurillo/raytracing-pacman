@@ -11,8 +11,9 @@ Build setup and validation commands are in [BUILD.md](BUILD.md).
 
 ## Behavior and documentation
 
+- Keep work in the background. Run graphical checks only on an isolated display; do not open windows or send input on the user's desktop unless explicitly requested.
 - Preserve the six existing levels and gameplay when changing repository boundaries.
-- Keep the maze centered and proportional through `Renderer.FitWorld(center, size)`. The HUD uses projected maze bounds and display-pixel font sizes. Native UDR quality is the default; retain Balanced and Performance options in the inspector.
+- Keep the maze centered and proportional through `Renderer.FitWorld(center, size)`. Project character overlays through the same fitted view. The HUD uses projected maze bounds and display-pixel font sizes. Balanced UDR quality is the default; retain Performance and Native options in the inspector.
 - Keep `.vscode` build/debug settings, `raytracing-pacman.sln`, and `raytracing-pacman.code-workspace` in sync with the sibling engine layout. The solution includes the engine library and all five engine/game projects.
 - Keep the README focused on the game. Put source setup, build, and test documentation in `BUILD.md`, and keep agent instructions in `AGENTS.md`.
 - Use unedited captures of the actual game for screenshots. The README uses `docs/screenshots/gameplay-maximized.png` (2880×1521); `gameplay-windowed.png` (1280×720) is an additional capture in the same directory. Preserve native resolution when refreshing them.

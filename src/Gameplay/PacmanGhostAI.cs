@@ -1783,9 +1783,6 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         int rainbowGhostCount = RainbowTotalCount;
         if (regularGhostCount == 0 && rainbowGhostCount == 0) return;
 
-        float horizontalScale = Renderer.ScreenWidth / Renderer.VirtualSize.X;
-        float verticalScale = Renderer.ScreenHeight / Renderer.VirtualSize.Y;
-
         Renderer.Reset()
             .Configure(BlendState.AlphaBlend)
             .SetTarget(null);
@@ -1814,11 +1811,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
             if (EyesTexture != null)
                 Renderer.DrawTexture(EyesTexture,
-                    new Rectangle(
-                        (int)((eyeCenterX - eyeRadius) * horizontalScale),
-                        (int)((eyeCenterY - eyeRadius) * verticalScale),
-                        (int)(eyeDiameter * horizontalScale),
-                        (int)(eyeDiameter * verticalScale)),
+                    Renderer.VirtualToScreenRect(eyeCenterX - eyeRadius, eyeCenterY - eyeRadius, eyeDiameter, eyeDiameter),
                     eyeColor);
         }
 
@@ -1846,11 +1839,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
             if (EyesTexture != null)
                 Renderer.DrawTexture(EyesTexture,
-                    new Rectangle(
-                        (int)((eyeCenterX - eyeRadius) * horizontalScale),
-                        (int)((eyeCenterY - eyeRadius) * verticalScale),
-                        (int)(eyeDiameter * horizontalScale),
-                        (int)(eyeDiameter * verticalScale)),
+                    Renderer.VirtualToScreenRect(eyeCenterX - eyeRadius, eyeCenterY - eyeRadius, eyeDiameter, eyeDiameter),
                     eyeColor);
         }
 

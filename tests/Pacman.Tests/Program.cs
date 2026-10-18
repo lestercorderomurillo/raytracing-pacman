@@ -36,6 +36,11 @@ if (args.Contains("--graphics"))
     using var window = new SmokeWindow(new PacmanMazeLevelScene(), "artifacts/smoke", ExerciseGame);
     window.Run();
 }
+else if (args.Contains("--rendering"))
+{
+    using var window = new RenderingWindow();
+    window.Run();
+}
 
 static void ExerciseGame(Scene scene, int frameNumber)
 {

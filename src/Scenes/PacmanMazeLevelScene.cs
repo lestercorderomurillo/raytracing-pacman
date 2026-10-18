@@ -179,7 +179,8 @@ public class PacmanMazeLevelScene : Scene
 
     public override void SetupECS()
     {
-        UDRQuality.Set(2); // Native resolution keeps small-window lighting and characters sharp.
+        UDRQuality.Set(1);
+        Renderer.RenderScale = UDRQuality.ScaleNormalized;
         Renderer.LoadFont("PressStart2P", "fonts/PressStart2P.ttf");
 
         ECS.AddSystem<Inspector>();

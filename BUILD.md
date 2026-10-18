@@ -61,6 +61,14 @@ dotnet run --project tests/Pacman.Tests -c Release
 dotnet run --project tests/Pacman.Tests -c Release -- --graphics
 ```
 
+**Rendering regressions** check eye alignment from actual rendered pixels, all three UDR upscalers and quality levels, both lighting modes, resizing, and disabling/re-enabling upscaling:
+
+```sh
+dotnet run --project tests/Pacman.Tests -c Release -- --rendering
+```
+
+Gameplay starts with UDR3 in Balanced quality (50% lighting render scale). F1 opens the inspector; use Pipeline to select the upscaler and its quality settings to choose Performance (25%), Balanced (50%), or Native (100%).
+
 **Presented-window checks** require an X11/XWayland desktop, Python with Pillow, `xdotool`, and ImageMagick:
 
 ```sh

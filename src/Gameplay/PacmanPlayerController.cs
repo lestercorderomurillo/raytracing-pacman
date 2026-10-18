@@ -330,8 +330,6 @@ public class PacmanPlayerController : com.radiant.engine.core.System
 
         if (EyesTexture == null || facingDirection.dy != 0) return;
 
-        float horizontalScale = Renderer.ScreenWidth / Renderer.VirtualSize.X;
-        float verticalScale = Renderer.ScreenHeight / Renderer.VirtualSize.Y;
         float playerCenterX = RenderPosition.X + WobbleX;
         float playerCenterY = RenderPosition.Y + WobbleY;
 
@@ -348,21 +346,13 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         if (facingDirection.dx == 1)
         {
             var sourceRectangle = new Rectangle(0, 0, textureWidth / 2, textureHeight);
-            var destinationRectangle = new Rectangle(
-                (int)((eyeCenterX - eyeRadius) * horizontalScale),
-                (int)((eyeCenterY - eyeRadius) * verticalScale),
-                (int)(eyeRadius * horizontalScale),
-                (int)(eyeDiameter * verticalScale));
+            var destinationRectangle = Renderer.VirtualToScreenRect(eyeCenterX - eyeRadius, eyeCenterY - eyeRadius, eyeRadius, eyeDiameter);
             Renderer.DrawSprite(EyesTexture, destinationRectangle, sourceRectangle, PlayerEyeColor, 0f, Vector2.Zero);
         }
         else if (facingDirection.dx == -1)
         {
             var sourceRectangle = new Rectangle(textureWidth / 2, 0, textureWidth / 2, textureHeight);
-            var destinationRectangle = new Rectangle(
-                (int)(eyeCenterX * horizontalScale),
-                (int)((eyeCenterY - eyeRadius) * verticalScale),
-                (int)(eyeRadius * horizontalScale),
-                (int)(eyeDiameter * verticalScale));
+            var destinationRectangle = Renderer.VirtualToScreenRect(eyeCenterX, eyeCenterY - eyeRadius, eyeRadius, eyeDiameter);
             Renderer.DrawSprite(EyesTexture, destinationRectangle, sourceRectangle, PlayerEyeColor, 0f, Vector2.Zero);
         }
 
