@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RadiantRoot Condition="'$(RadiantRoot)' == ''">$(MSBuildProjectDirectory)/../../../radiant-game-engine</RadiantRoot>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <RollForward>Major</RollForward>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../raytracing-pacman.csproj" />
+    <Compile Include="$(RadiantRoot)/tests/Shared/SmokeWindow.cs" Link="SmokeWindow.cs" />
+  </ItemGroup>
+</Project>

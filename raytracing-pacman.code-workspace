@@ -1,0 +1,25 @@
+{
+  "folders": [
+    {
+      "name": "Pac-Man",
+      "path": "."
+    },
+    {
+      "name": "Radiant",
+      "path": "../radiant-game-engine"
+    }
+  ],
+  "settings": {
+    "dotnet.defaultSolution": "raytracing-pacman.sln",
+    "files.associations": {
+      "*.fx": "hlsl",
+      "*.mgcb": "plaintext"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-dotnettools.csdevkit",
+      "slevesque.shader"
+    ]
+  }
+}

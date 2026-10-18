@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RadiantRoot Condition="'$(RadiantRoot)' == ''">$(MSBuildProjectDirectory)/../radiant-game-engine</RadiantRoot>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <Import Project="$(RadiantRoot)/eng/Radiant.Desktop.props" Condition="Exists('$(RadiantRoot)/eng/Radiant.Desktop.props')" />
+  <ItemGroup>
+    <Compile Include="Program.cs;src/**/*.cs" />
+    <ProjectReference Include="$(RadiantRoot)/radiant.csproj" />
+    <MonoGameContentReference Include="Content/Content.mgcb" />
+    <Content Include="Content/fonts/*.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CheckRadiantCheckout" BeforeTargets="CollectPackageReferences;PrepareForBuild">
+    <Error Condition="!Exists('$(RadiantRoot)/eng/Radiant.Desktop.props')" Text="Clone radiant-game-engine beside this repository, or set -p:RadiantRoot=/path/to/radiant-game-engine. See README.md for the paired checkout instructions." />
+  </Target>
+</Project>

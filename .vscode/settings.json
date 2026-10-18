@@ -1,0 +1,7 @@
+{
+  "dotnet.defaultSolution": "raytracing-pacman.sln",
+  "files.associations": {
+    "*.fx": "hlsl",
+    "*.mgcb": "plaintext"
+  }
+}

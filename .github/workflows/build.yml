@@ -1,0 +1,33 @@
+name: Build Pac-Man with Radiant
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      engine_ref:
+        description: Compatible Radiant branch, tag, or commit
+        default: main
+        type: string
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: raytracing-pacman
+      - uses: actions/checkout@v4
+        with:
+          repository: lestercorderomurillo/radiant-game-engine
+          ref: ${{ inputs.engine_ref || 'main' }}
+          path: radiant-game-engine
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build -c Release
+        working-directory: raytracing-pacman
+      - run: dotnet run --project tests/Pacman.Tests -c Release
+        working-directory: raytracing-pacman
+      - run: dotnet publish raytracing-pacman.csproj -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64
+        working-directory: raytracing-pacman
