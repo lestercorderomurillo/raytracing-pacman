@@ -30,57 +30,57 @@ public class PacmanHUD : com.radiant.engine.core.System
         if (Player == null || !Player.IsTracked || Geometry.IsDebugHidingGameplay) return;
 
         // HUD text is measured in display pixels so it stays readable in a small window.
-        float HudFontSize = MathF.Round(Math.Clamp(Renderer.ScreenHeight / 720f * 14f, 10f, 24f));
+        float hudFontSize = MathF.Round(Math.Clamp(Renderer.ScreenHeight / 720f * 14f, 10f, 24f));
         float padding = 8f;
-        float iconSize = HudFontSize + 4f;
+        float iconSize = hudFontSize + 4f;
         float gap = 8f;
 
-        var MazeTopLeft = Renderer.WorldToScreen(new Vector2(Maze.OffsetX + 40f, Maze.OffsetY));
-        float mazeLeft = MazeTopLeft.X;
-        float mazeRight = Renderer.WorldToScreen(new Vector2(Maze.OffsetX + Maze.Cols * Maze.CellSize - 40f, Maze.OffsetY)).X;
-        float y = MathF.Max(8f, MazeTopLeft.Y - HudFontSize - 8f);
+        var mazeTopLeft = Renderer.WorldToScreen(new Vector2(Maze.OffsetX + 40f, Maze.OffsetY));
+        float mazeLeft = mazeTopLeft.X;
+        float mazeRight = Renderer.WorldToScreen(new Vector2(Maze.OffsetX + Maze.Columns * Maze.CellSize - 40f, Maze.OffsetY)).X;
+        float textY = MathF.Max(8f, mazeTopLeft.Y - hudFontSize - 8f);
 
-        string LevelLabel = $"LEVEL {Player.LevelTag}";
-        var tagSize = Renderer.MeasureString(HudFontName, HudFontSize, LevelLabel);
-        float tagBlockWidth = tagSize.X;
-        float textHeight = tagSize.Y;
+        string levelLabel = $"LEVEL {Player.LevelTag}";
+        var levelTextSize = Renderer.MeasureString(HudFontName, hudFontSize, levelLabel);
+        float levelBlockWidth = levelTextSize.X;
+        float textHeight = levelTextSize.Y;
 
-        string collected = Player.CoinsCollected.ToString();
+        string collectedText = Player.CoinsCollected.ToString();
         string separator = " / ";
-        string total = Player.CoinsTotal.ToString();
-        var collectedSize = Renderer.MeasureString(HudFontName, HudFontSize, collected);
-        var separatorSize = Renderer.MeasureString(HudFontName, HudFontSize, separator);
-        var totalSize = Renderer.MeasureString(HudFontName, HudFontSize, total);
-        float coinTextWidth = collectedSize.X + separatorSize.X + totalSize.X;
+        string totalText = Player.CoinsTotal.ToString();
+        var collectedTextSize = Renderer.MeasureString(HudFontName, hudFontSize, collectedText);
+        var separatorSize = Renderer.MeasureString(HudFontName, hudFontSize, separator);
+        var totalTextSize = Renderer.MeasureString(HudFontName, hudFontSize, totalText);
+        float coinTextWidth = collectedTextSize.X + separatorSize.X + totalTextSize.X;
         float coinBlockWidth = iconSize + gap + coinTextWidth;
 
         Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend, SamplerState.PointClamp);
 
-        float tagX = mazeLeft;
-        var tagBg = new Rectangle(
-            (int)(tagX - padding), (int)(y - padding * 0.6f),
-            (int)(tagBlockWidth + padding * 2f), (int)(textHeight + padding * 1.2f));
-        Renderer.DrawSprite(Renderer.GetSolidTexture(Color.White), tagBg, new Color(0, 0, 0, 180));
-        Renderer.DrawString(HudFontName, HudFontSize, LevelLabel, new Vector2(tagX, y), new Color(255, 255, 255));
+        float levelX = mazeLeft;
+        var levelBackground = new Rectangle(
+            (int)(levelX - padding), (int)(textY - padding * 0.6f),
+            (int)(levelBlockWidth + padding * 2f), (int)(textHeight + padding * 1.2f));
+        Renderer.DrawSprite(Renderer.GetSolidTexture(Color.White), levelBackground, new Color(0, 0, 0, 180));
+        Renderer.DrawString(HudFontName, hudFontSize, levelLabel, new Vector2(levelX, textY), new Color(255, 255, 255));
 
         float coinX = mazeRight - coinBlockWidth;
-        var coinBg = new Rectangle(
-            (int)(coinX - padding), (int)(y - padding * 0.6f),
+        var coinBackground = new Rectangle(
+            (int)(coinX - padding), (int)(textY - padding * 0.6f),
             (int)(coinBlockWidth + padding * 2f), (int)(textHeight + padding * 1.2f));
-        Renderer.DrawSprite(Renderer.GetSolidTexture(Color.White), coinBg, new Color(0, 0, 0, 180));
+        Renderer.DrawSprite(Renderer.GetSolidTexture(Color.White), coinBackground, new Color(0, 0, 0, 180));
 
-        var coinTex = Renderer.GetCircleTexture((int)iconSize);
-        var iconRect = new Rectangle(
-            (int)coinX, (int)(y + (textHeight - iconSize) / 2f),
+        var coinTexture = Renderer.GetCircleTexture((int)iconSize);
+        var iconRectangle = new Rectangle(
+            (int)coinX, (int)(textY + (textHeight - iconSize) / 2f),
             (int)iconSize, (int)iconSize);
-        Renderer.DrawSprite(coinTex, iconRect, Player.CoinColor);
+        Renderer.DrawSprite(coinTexture, iconRectangle, Player.CoinColor);
 
         float textX = coinX + iconSize + gap;
-        Renderer.DrawString(HudFontName, HudFontSize, collected, new Vector2(textX, y), Player.CoinColor);
-        textX += collectedSize.X;
-        Renderer.DrawString(HudFontName, HudFontSize, separator, new Vector2(textX, y), new Color(200, 200, 200));
+        Renderer.DrawString(HudFontName, hudFontSize, collectedText, new Vector2(textX, textY), Player.CoinColor);
+        textX += collectedTextSize.X;
+        Renderer.DrawString(HudFontName, hudFontSize, separator, new Vector2(textX, textY), new Color(200, 200, 200));
         textX += separatorSize.X;
-        Renderer.DrawString(HudFontName, HudFontSize, total, new Vector2(textX, y), new Color(255, 255, 255));
+        Renderer.DrawString(HudFontName, hudFontSize, totalText, new Vector2(textX, textY), new Color(255, 255, 255));
 
         Renderer.EndDraw();
     }

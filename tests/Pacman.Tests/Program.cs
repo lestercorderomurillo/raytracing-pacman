@@ -8,76 +8,87 @@ using RaytracingPacman;
 using Radiant.Testing;
 using Microsoft.Xna.Framework;
 
-var Engine = typeof(Scene).Assembly;
-var Game = typeof(PacmanMazeLevelScene).Assembly;
-if (Engine == Game || Engine.GetTypes().Any(Type => Type.Name.Contains("Pacman") || Type.Name.EndsWith("LevelScene")))
+var engineAssembly = typeof(Scene).Assembly;
+var gameAssembly = typeof(PacmanMazeLevelScene).Assembly;
+
+if (engineAssembly == gameAssembly || engineAssembly.GetTypes().Any(type => type.Name.Contains("Pacman") || type.Name.EndsWith("LevelScene")))
     throw new Exception("Engine contains game implementation types.");
-if (Engine.GetTypes().Any(Type => Type.Name is "SimpleLightScene" or "TilesetScene"))
+if (engineAssembly.GetTypes().Any(type => type.Name is "SimpleLightScene" or "TilesetScene"))
     throw new Exception("Engine library contains test scenes.");
-if (Engine.GetReferencedAssemblies().Any(Name => Name.Name == Game.GetName().Name))
+if (engineAssembly.GetReferencedAssemblies().Any(assemblyName => assemblyName.Name == gameAssembly.GetName().Name))
     throw new Exception("Engine depends on game assembly.");
-for (int Seed = 0; Seed < 64; Seed++)
+
+for (int seed = 0; seed < 64; seed++)
 {
-    var Maze = PacmanMazeGenerator.Generate(Seed);
-    if (Maze.Length != 31 || Maze.Any(Row => Row.Length != 28))
-        throw new Exception($"Invalid maze dimensions for seed {Seed}.");
-    if (!Maze.SequenceEqual(PacmanMazeGenerator.Generate(Seed)))
-        throw new Exception($"Maze seed {Seed} is not reproducible.");
-    if (Maze.Any(Row => !Row.SequenceEqual(Row.Reverse())))
-        throw new Exception($"Maze seed {Seed} is not symmetric.");
-}
-Console.WriteLine("PASS: independent engine/game assemblies, engine test isolation, 64 deterministic symmetric mazes.");
-if (args.Contains("--graphics"))
-{
-    using var Window = new SmokeWindow(new PacmanMazeLevelScene(), "artifacts/smoke", ExerciseGame);
-    Window.Run();
+    var maze = PacmanMazeGenerator.Generate(seed);
+    if (maze.Length != 31 || maze.Any(row => row.Length != 28))
+        throw new Exception($"Invalid maze dimensions for seed {seed}.");
+    if (!maze.SequenceEqual(PacmanMazeGenerator.Generate(seed)))
+        throw new Exception($"Maze seed {seed} is not reproducible.");
+    if (maze.Any(row => !row.SequenceEqual(row.Reverse())))
+        throw new Exception($"Maze seed {seed} is not symmetric.");
 }
 
-static void ExerciseGame(Scene Scene, int Frame)
+Console.WriteLine("PASS: independent engine/game assemblies, engine test isolation, 64 deterministic symmetric mazes.");
+
+if (args.Contains("--graphics"))
 {
-    var Maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
-    var Renderer = Scene.Renderer;
-    var Center = new Vector2(Maze.OffsetX + Maze.Cols * Maze.CellSize / 2f,
-        Maze.OffsetY + Maze.Rows * Maze.CellSize / 2f);
-    if (Vector2.Distance(Renderer.WorldToScreen(Center), Renderer.ScreenSize / 2f) > 0.01f)
+    using var window = new SmokeWindow(new PacmanMazeLevelScene(), "artifacts/smoke", ExerciseGame);
+    window.Run();
+}
+
+static void ExerciseGame(Scene scene, int frameNumber)
+{
+    var maze = scene.ECS.GetSystem<PacmanMazeBuilder>();
+    var renderer = scene.Renderer;
+    var mazeCenter = new Vector2(maze.OffsetX + maze.Columns * maze.CellSize / 2f,
+        maze.OffsetY + maze.Rows * maze.CellSize / 2f);
+    if (Vector2.Distance(renderer.WorldToScreen(mazeCenter), renderer.ScreenSize / 2f) > 0.01f)
         throw new Exception("Maze is not centered after resize or level transition.");
-    var HorizontalCell = Renderer.WorldToScreen(Center + new Vector2(Maze.CellSize, 0)) - Renderer.WorldToScreen(Center);
-    var VerticalCell = Renderer.WorldToScreen(Center + new Vector2(0, Maze.CellSize)) - Renderer.WorldToScreen(Center);
-    if (MathF.Abs(HorizontalCell.Length() - VerticalCell.Length()) > 0.01f)
+
+    var horizontalCellOffset = renderer.WorldToScreen(mazeCenter + new Vector2(maze.CellSize, 0)) - renderer.WorldToScreen(mazeCenter);
+    var verticalCellOffset = renderer.WorldToScreen(mazeCenter + new Vector2(0, maze.CellSize)) - renderer.WorldToScreen(mazeCenter);
+    if (MathF.Abs(horizontalCellOffset.Length() - verticalCellOffset.Length()) > 0.01f)
         throw new Exception("Window aspect ratio stretches maze cells.");
-    if (Vector2.Distance(Renderer.ScreenToWorld(Renderer.WorldToScreen(Center)), Center) > 0.01f)
+    if (Vector2.Distance(renderer.ScreenToWorld(renderer.WorldToScreen(mazeCenter)), mazeCenter) > 0.01f)
         throw new Exception("World-to-screen input mapping does not round-trip.");
 
     // Invoke the actual inspector callbacks, independent of window placement/DPI.
-    var InspectorSystem = Scene.ECS.GetSystem<Inspector>();
-    var WindowsField = typeof(Inspector).GetField("Windows", BindingFlags.Instance | BindingFlags.NonPublic);
-    var Windows = (Dictionary<string, WindowData>)WindowsField.GetValue(InspectorSystem);
-    Widget GetWidget(string WindowId, string WidgetId)
+    var inspectorSystem = scene.ECS.GetSystem<Inspector>();
+    var windowsField = typeof(Inspector).GetField("Windows", BindingFlags.Instance | BindingFlags.NonPublic);
+    var windows = (Dictionary<string, WindowData>)windowsField.GetValue(inspectorSystem);
+
+    Widget GetWidget(string windowId, string widgetId)
     {
-        var Window = Windows[WindowId];
-        return Window.Widgets[Window.WidgetIndex[WidgetId]];
+        var window = windows[windowId];
+        return window.Widgets[window.WidgetIndex[widgetId]];
     }
-    if (Frame >= 20 && Frame <= 60 && Frame % 10 == 0)
+
+    if (frameNumber >= 20 && frameNumber <= 60 && frameNumber % 10 == 0)
     {
         GetWidget("scene", "nextLevel").ButtonCallback();
-        var Player = Scene.ECS.GetSystem<PacmanPlayerController>();
-        if (!Player.IsTracked || Player.CoinsTotal <= 0)
+        var player = scene.ECS.GetSystem<PacmanPlayerController>();
+        if (!player.IsTracked || player.CoinsTotal <= 0)
             throw new Exception("Level transition did not create the player and coins.");
-        Console.WriteLine($"Level {Player.LevelTag}: {Player.CoinsTotal} coins, {Scene.ECS.EntityCount} entities.");
+
+        Console.WriteLine($"Level {player.LevelTag}: {player.CoinsTotal} coins, {scene.ECS.EntityCount} entities.");
     }
-    if (Frame == 25) GetWidget("pipeline", "lighting").DropdownCallback(1);
-    if (Frame == 35) GetWidget("pipeline", "upscaler").DropdownCallback(0);
-    if (Frame == 45) GetWidget("pipeline", "upscaler").DropdownCallback(1);
-    if (Frame == 55) GetWidget("pipeline", "upscaler").DropdownCallback(2);
-    if (Frame == 65) GetWidget("pipeline", "lighting").DropdownCallback(0);
-    if (Frame == 70) GetWidget("scene", "restartLevel").ButtonCallback();
-    if (Frame == 75)
+
+    if (frameNumber == 25) GetWidget("pipeline", "lighting").DropdownCallback(1);
+    if (frameNumber == 35) GetWidget("pipeline", "upscaler").DropdownCallback(0);
+    if (frameNumber == 45) GetWidget("pipeline", "upscaler").DropdownCallback(1);
+    if (frameNumber == 55) GetWidget("pipeline", "upscaler").DropdownCallback(2);
+    if (frameNumber == 65) GetWidget("pipeline", "lighting").DropdownCallback(0);
+    if (frameNumber == 70) GetWidget("scene", "restartLevel").ButtonCallback();
+
+    if (frameNumber == 75)
     {
         GetWidget("scene", "pause").ToggleCallback(true);
-        if (!Scene.ECS.GameplayPaused || !Scene.ECS.AnimationPaused)
+        if (!scene.ECS.GameplayPaused || !scene.ECS.AnimationPaused)
             throw new Exception("Pause callback did not pause gameplay and animation.");
     }
-    if (Frame == 80)
+
+    if (frameNumber == 80)
     {
         GetWidget("scene", "pause").ToggleCallback(false);
         GetWidget("scene", "prevLevel").ButtonCallback();

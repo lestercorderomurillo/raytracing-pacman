@@ -30,17 +30,17 @@ public class PacmanPlayerController : com.radiant.engine.core.System
     public Vector2 RenderPosition { get; private set; }
     public float WobbleX { get; private set; }
     public float WobbleY { get; private set; }
-    public (int dx, int dy) FacingDir { get; private set; } = (1, 0);
+    public (int dx, int dy) FacingDirection { get; private set; } = (1, 0);
     public bool MouthOpen { get; private set; }
     public float MouthRotation { get; private set; }
     public float BodyRadius { get; private set; }
     public float CollectFlash { get; private set; }
 
-    const int RTSize = 128;
+    const int RenderTargetSize = 128;
     static readonly Color PlayerEyeColor = new Color(30, 15, 5);
 
-    RenderTarget2D PlayerRT;
-    Texture2D CircleTex;
+    RenderTarget2D PlayerRenderTarget;
+    Texture2D CircleTexture;
     Texture2D MouthTexture;
     Texture2D EyesTexture;
     Geometry Geometry;
@@ -50,48 +50,51 @@ public class PacmanPlayerController : com.radiant.engine.core.System
 
     PacmanMazeBuilder Maze;
     public float Speed { get; set; } = 200f;
-    float Z;
-    const string HudFontName = "PressStart2P";
-    (int x, int y) PrevCell = (-1, -1);
+    float Depth;
+    (int x, int y) PreviousCell = (-1, -1);
 
     (int x, int y) TargetCell;
-    (int dx, int dy) CurrentDir;
-    (int dx, int dy) BufferedDir;
+    (int dx, int dy) CurrentDirection;
+    (int dx, int dy) BufferedDirection;
 
     float MouthTimer;
-    Vector2 PrevRenderPos;
+    Vector2 PreviousRenderPosition;
     float IdleTime;
 
-    public void Track(int entityId, (int x, int y) startCell, float z)
+    public void Track(int entityId, (int x, int y) startCell, float depth)
     {
         EntityId = entityId;
         Cell = startCell;
         TargetCell = startCell;
-        CurrentDir = (0, 0);
-        BufferedDir = (0, 0);
-        Z = z;
+        CurrentDirection = (0, 0);
+        BufferedDirection = (0, 0);
+        Depth = depth;
         WorldPosition = Maze.CellCenter(startCell.x, startCell.y);
+
         IsTracked = true;
         PlayerCaught = false;
         HasMoved = false;
-        PrevCell = startCell;
+        PreviousCell = startCell;
         CoinsCollected = 0;
         CoinsTotal = Maze.CoinCells.Count;
+
         RenderPosition = WorldPosition;
-        PrevRenderPos = WorldPosition;
-        FacingDir = (1, 0);
+        PreviousRenderPosition = WorldPosition;
+        FacingDirection = (1, 0);
         MouthTimer = 0f;
         MouthOpen = true;
         MouthRotation = 0f;
         CollectFlash = 0f;
         BodyRadius = Scene.ECS.GetComponent<Circle2D>(entityId).Radius;
+
         ref var material = ref Scene.ECS.GetComponent<Material>(entityId);
-        material.Texture = PlayerRT;
+        material.Texture = PlayerRenderTarget;
     }
 
     public void Clear()
     {
         if (!IsTracked) return;
+
         Scene.ECS.DestroyEntity(EntityId);
         IsTracked = false;
         CoinsCollected = 0;
@@ -101,9 +104,11 @@ public class PacmanPlayerController : com.radiant.engine.core.System
     public void HidePlayer()
     {
         if (PlayerHidden || !IsTracked || !Scene.ECS.IsAlive(EntityId)) return;
+
         ref var material = ref Scene.ECS.GetComponent<Material>(EntityId);
         SavedAlbedo = material.Albedo;
         SavedEmissive = material.Emissive;
+
         material.Albedo = Color.Transparent;
         material.Emissive = Color.Transparent;
         PlayerHidden = true;
@@ -112,6 +117,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
     public void ShowPlayer()
     {
         if (!PlayerHidden || !IsTracked || !Scene.ECS.IsAlive(EntityId)) return;
+
         ref var material = ref Scene.ECS.GetComponent<Material>(EntityId);
         material.Albedo = SavedAlbedo;
         material.Emissive = SavedEmissive;
@@ -122,10 +128,11 @@ public class PacmanPlayerController : com.radiant.engine.core.System
     {
         Maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
         Geometry = Scene.ECS.GetSystem<Geometry>();
+
         EyesTexture = Renderer.GetTexture("Eyes");
-        MouthTexture = CreateMouthTexture(RTSize);
-        CircleTex = Renderer.GetCircleTexture(RTSize);
-        PlayerRT = Renderer.CreateRenderTarget(RTSize, RTSize);
+        MouthTexture = CreateMouthTexture(RenderTargetSize);
+        CircleTexture = Renderer.GetCircleTexture(RenderTargetSize);
+        PlayerRenderTarget = Renderer.CreateRenderTarget(RenderTargetSize, RenderTargetSize);
     }
 
     public override void Update()
@@ -133,99 +140,99 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         if (Maze == null || !IsTracked) return;
         if (Scene.ECS.IsDisabled(EntityId)) return;
 
-        RenderPosition = PrevRenderPos;
-        PrevRenderPos = WorldPosition;
+        RenderPosition = PreviousRenderPosition;
+        PreviousRenderPosition = WorldPosition;
 
-        var kb = Keyboard.GetState();
-        ReadInput(kb);
+        var keyboardState = Keyboard.GetState();
+        ReadInput(keyboardState);
 
-        float dt = (float)GameTime.ElapsedGameTime.TotalSeconds;
-        float step = Speed * dt;
+        float deltaTime = (float)GameTime.ElapsedGameTime.TotalSeconds;
+        float moveDistance = Speed * deltaTime;
 
         if (!Scene.ECS.IsAlive(EntityId)) return;
 
         ref var transform = ref Scene.ECS.GetComponent<Transform>(EntityId);
 
-        var pos = WorldPosition;
-        var target = Maze.CellCenter(TargetCell.x, TargetCell.y);
+        var position = WorldPosition;
+        var targetPosition = Maze.CellCenter(TargetCell.x, TargetCell.y);
 
-        var diff = target - pos;
-        float dist = diff.Length();
+        var targetOffset = targetPosition - position;
+        float distanceToTarget = targetOffset.Length();
 
-        if (dist <= step)
+        if (distanceToTarget <= moveDistance)
         {
-            var raw = TargetCell;
-            Cell = (Maze.WrapX(raw.x), raw.y);
-            pos = Maze.CellCenter(Cell.x, Cell.y);
+            var unwrappedTargetCell = TargetCell;
+            Cell = (Maze.WrapX(unwrappedTargetCell.x), unwrappedTargetCell.y);
+            position = Maze.CellCenter(Cell.x, Cell.y);
 
-            if (Cell != PrevCell)
+            if (Cell != PreviousCell)
             {
                 if (!HasMoved) HasMoved = true;
                 CollectAt(Cell.x, Cell.y);
-                PrevCell = Cell;
+                PreviousCell = Cell;
             }
 
-            if (BufferedDir != (0, 0) && Maze.CanMove(Cell.x, Cell.y, BufferedDir.dx, BufferedDir.dy))
+            if (BufferedDirection != (0, 0) && Maze.CanMove(Cell.x, Cell.y, BufferedDirection.dx, BufferedDirection.dy))
             {
-                CurrentDir = BufferedDir;
-                BufferedDir = (0, 0);
+                CurrentDirection = BufferedDirection;
+                BufferedDirection = (0, 0);
             }
 
-            if (CurrentDir != (0, 0) && Maze.CanMove(Cell.x, Cell.y, CurrentDir.dx, CurrentDir.dy))
+            if (CurrentDirection != (0, 0) && Maze.CanMove(Cell.x, Cell.y, CurrentDirection.dx, CurrentDirection.dy))
             {
-                TargetCell = (Cell.x + CurrentDir.dx, Cell.y + CurrentDir.dy);
+                TargetCell = (Cell.x + CurrentDirection.dx, Cell.y + CurrentDirection.dy);
             }
             else
             {
-                CurrentDir = (0, 0);
+                CurrentDirection = (0, 0);
                 TargetCell = Cell;
             }
 
-            target = Maze.CellCenter(TargetCell.x, TargetCell.y);
-            diff = target - pos;
-            dist = diff.Length();
+            targetPosition = Maze.CellCenter(TargetCell.x, TargetCell.y);
+            targetOffset = targetPosition - position;
+            distanceToTarget = targetOffset.Length();
         }
 
-        if (dist > 0.01f)
+        if (distanceToTarget > 0.01f)
         {
-            var move = diff / dist * MathF.Min(step, dist);
-            pos += move;
+            var movementOffset = targetOffset / distanceToTarget * MathF.Min(moveDistance, distanceToTarget);
+            position += movementOffset;
         }
 
-        IdleTime += dt;
+        IdleTime += deltaTime;
         float wobble = MathF.Sin(IdleTime * 3f) * 3f;
-        WobbleX = CurrentDir.dy != 0 ? wobble : 0f;
-        WobbleY = CurrentDir.dy != 0 ? 0f : wobble;
-        transform.Position = new Vector3(pos.X + WobbleX, pos.Y + WobbleY, Z);
-        WorldPosition = pos;
+        WobbleX = CurrentDirection.dy != 0 ? wobble : 0f;
+        WobbleY = CurrentDirection.dy != 0 ? 0f : wobble;
+        transform.Position = new Vector3(position.X + WobbleX, position.Y + WobbleY, Depth);
+        WorldPosition = position;
 
-        if (CurrentDir != (0, 0))
+        if (CurrentDirection != (0, 0))
         {
-            int aheadX = Maze.WrapX(Cell.x + CurrentDir.dx);
-            int aheadY = Cell.y + CurrentDir.dy;
-            var aheadCenter = Maze.CellCenter(aheadX, aheadY);
-            float adx = pos.X - aheadCenter.X;
-            float ady = pos.Y - aheadCenter.Y;
+            int aheadCellX = Maze.WrapX(Cell.x + CurrentDirection.dx);
+            int aheadCellY = Cell.y + CurrentDirection.dy;
+            var aheadCellCenter = Maze.CellCenter(aheadCellX, aheadCellY);
+            float aheadOffsetX = position.X - aheadCellCenter.X;
+            float aheadOffsetY = position.Y - aheadCellCenter.Y;
             float reachThreshold = Maze.CellSize * 0.425f;
-            if (adx * adx + ady * ady < reachThreshold * reachThreshold)
-                CollectAt(aheadX, aheadY);
+            if (aheadOffsetX * aheadOffsetX + aheadOffsetY * aheadOffsetY < reachThreshold * reachThreshold)
+                CollectAt(aheadCellX, aheadCellY);
         }
 
         if (CollectFlash > 0f)
-            CollectFlash = MathF.Max(0f, CollectFlash - dt * 4f);
+            CollectFlash = MathF.Max(0f, CollectFlash - deltaTime * 4f);
 
         ref var circle = ref Scene.ECS.GetComponent<Circle2D>(EntityId);
         circle.Radius = BodyRadius * (1f + CollectFlash * 0.20f);
 
-        if (CurrentDir != (0, 0))
+        if (CurrentDirection != (0, 0))
         {
-            FacingDir = CurrentDir;
-            MouthTimer += dt * 24f;
+            FacingDirection = CurrentDirection;
+            MouthTimer += deltaTime * 24f;
         }
 
         float phase = (MathF.Sin(MouthTimer) + 1f) / 2f;
-        MouthOpen = CurrentDir == (0, 0) || phase > 0.3f;
-        MouthRotation = (FacingDir.dx, FacingDir.dy) switch
+        MouthOpen = CurrentDirection == (0, 0) || phase > 0.3f;
+        MouthRotation = (FacingDirection.dx, FacingDirection.dy) switch
         {
             (1, 0) => 0f,
             (0, 1) => MathF.PI / 2f,
@@ -234,47 +241,47 @@ public class PacmanPlayerController : com.radiant.engine.core.System
             _ => 0f
         };
 
-        RenderPlayerRT();
+        RenderPlayerTexture();
     }
 
-    void ReadInput(KeyboardState kb)
+    void ReadInput(KeyboardState keyboardState)
     {
-        (int dx, int dy) desired = (0, 0);
+        (int dx, int dy) desiredDirection = (0, 0);
 
-        if (kb.IsKeyDown(Keys.Up)) desired = (0, -1);
-        else if (kb.IsKeyDown(Keys.Left)) desired = (-1, 0);
-        else if (kb.IsKeyDown(Keys.Down)) desired = (0, 1);
-        else if (kb.IsKeyDown(Keys.Right)) desired = (1, 0);
+        if (keyboardState.IsKeyDown(Keys.Up)) desiredDirection = (0, -1);
+        else if (keyboardState.IsKeyDown(Keys.Left)) desiredDirection = (-1, 0);
+        else if (keyboardState.IsKeyDown(Keys.Down)) desiredDirection = (0, 1);
+        else if (keyboardState.IsKeyDown(Keys.Right)) desiredDirection = (1, 0);
 
-        if (desired == (0, 0)) return;
+        if (desiredDirection == (0, 0)) return;
 
-        if (Maze.CanMove(Cell.x, Cell.y, desired.dx, desired.dy))
+        if (Maze.CanMove(Cell.x, Cell.y, desiredDirection.dx, desiredDirection.dy))
         {
-            if (desired.dx == -CurrentDir.dx && desired.dy == -CurrentDir.dy)
+            if (desiredDirection.dx == -CurrentDirection.dx && desiredDirection.dy == -CurrentDirection.dy)
             {
-                CurrentDir = desired;
-                TargetCell = (Cell.x + desired.dx, Cell.y + desired.dy);
-                BufferedDir = (0, 0);
+                CurrentDirection = desiredDirection;
+                TargetCell = (Cell.x + desiredDirection.dx, Cell.y + desiredDirection.dy);
+                BufferedDirection = (0, 0);
                 return;
             }
 
-            BufferedDir = desired;
+            BufferedDirection = desiredDirection;
         }
         else
         {
-            BufferedDir = desired;
+            BufferedDirection = desiredDirection;
         }
     }
 
-    void CollectAt(int cx, int cy)
+    void CollectAt(int cellX, int cellY)
     {
-        if (Maze.TryCollectCoin(cx, cy))
+        if (Maze.TryCollectCoin(cellX, cellY))
         {
             CoinsCollected++;
             CollectFlash = 1f;
         }
 
-        if (Maze.TryCollectPowerPellet(cx, cy))
+        if (Maze.TryCollectPowerPellet(cellX, cellY))
         {
             GhostAI?.SetFrightened(FrightenedDuration);
             GhostAI?.SetRainbowFrightened(FrightenedDuration);
@@ -286,25 +293,28 @@ public class PacmanPlayerController : com.radiant.engine.core.System
     {
         if (Geometry.IsDebugHidingGameplay) return;
         if (Scene.ECS.IsDisabled(EntityId)) return;
+
         DrawPlayerEyes();
     }
 
-    void RenderPlayerRT()
+    void RenderPlayerTexture()
     {
-        if (PlayerRT == null || !IsTracked) return;
+        if (PlayerRenderTarget == null || !IsTracked) return;
 
         Renderer.PushTargets();
-        Renderer.SetTarget(PlayerRT).Clear(Color.Transparent);
+        Renderer.SetTarget(PlayerRenderTarget).Clear(Color.Transparent);
 
         Renderer.BeginDraw(SpriteSortMode.Immediate, BlendState.AlphaBlend);
-        Renderer.DrawSprite(CircleTex, new Rectangle(0, 0, RTSize, RTSize), Color.White);
+
+        Renderer.DrawSprite(CircleTexture, new Rectangle(0, 0, RenderTargetSize, RenderTargetSize), Color.White);
+
         Renderer.EndDraw();
 
         if (MouthOpen)
         {
-            int half = RTSize / 2;
-            var origin = new Vector2(half, half);
-            Renderer.BlitMask(MouthTexture, new Rectangle(half, half, RTSize, RTSize), MouthRotation, origin);
+            int halfSize = RenderTargetSize / 2;
+            var origin = new Vector2(halfSize, halfSize);
+            Renderer.BlitMask(MouthTexture, new Rectangle(halfSize, halfSize, RenderTargetSize, RenderTargetSize), MouthRotation, origin);
         }
 
         Renderer.PopTargets();
@@ -316,44 +326,44 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         if (!Scene.ECS.IsAlive(EntityId)) return;
 
         float radius = Scene.ECS.GetComponent<Circle2D>(EntityId).Radius;
-        var facingDir = FacingDir;
+        var facingDirection = FacingDirection;
 
-        if (EyesTexture == null || facingDir.dy != 0) return;
+        if (EyesTexture == null || facingDirection.dy != 0) return;
 
-        float sx = Renderer.ScreenWidth / Renderer.VirtualSize.X;
-        float sy = Renderer.ScreenHeight / Renderer.VirtualSize.Y;
-        float pcx = RenderPosition.X + WobbleX;
-        float pcy = RenderPosition.Y + WobbleY;
+        float horizontalScale = Renderer.ScreenWidth / Renderer.VirtualSize.X;
+        float verticalScale = Renderer.ScreenHeight / Renderer.VirtualSize.Y;
+        float playerCenterX = RenderPosition.X + WobbleX;
+        float playerCenterY = RenderPosition.Y + WobbleY;
 
-        float eyeR = radius * 0.767f;
-        float eyeD = eyeR * 2f;
-        float eyeOff = radius * 0.133f;
-        float ecx = pcx + facingDir.dx * eyeOff;
-        float ecy = pcy + facingDir.dy * eyeOff - radius * 0.1f;
-        int texW = EyesTexture.Width;
-        int texH = EyesTexture.Height;
+        float eyeRadius = radius * 0.767f;
+        float eyeDiameter = eyeRadius * 2f;
+        float eyeOffset = radius * 0.133f;
+        float eyeCenterX = playerCenterX + facingDirection.dx * eyeOffset;
+        float eyeCenterY = playerCenterY + facingDirection.dy * eyeOffset - radius * 0.1f;
+        int textureWidth = EyesTexture.Width;
+        int textureHeight = EyesTexture.Height;
 
         Renderer.BeginDraw(SpriteSortMode.Deferred, BlendState.AlphaBlend);
 
-        if (facingDir.dx == 1)
+        if (facingDirection.dx == 1)
         {
-            var src = new Rectangle(0, 0, texW / 2, texH);
-            var dst = new Rectangle(
-                (int)((ecx - eyeR) * sx),
-                (int)((ecy - eyeR) * sy),
-                (int)(eyeR * sx),
-                (int)(eyeD * sy));
-            Renderer.DrawSprite(EyesTexture, dst, src, PlayerEyeColor, 0f, Vector2.Zero);
+            var sourceRectangle = new Rectangle(0, 0, textureWidth / 2, textureHeight);
+            var destinationRectangle = new Rectangle(
+                (int)((eyeCenterX - eyeRadius) * horizontalScale),
+                (int)((eyeCenterY - eyeRadius) * verticalScale),
+                (int)(eyeRadius * horizontalScale),
+                (int)(eyeDiameter * verticalScale));
+            Renderer.DrawSprite(EyesTexture, destinationRectangle, sourceRectangle, PlayerEyeColor, 0f, Vector2.Zero);
         }
-        else if (facingDir.dx == -1)
+        else if (facingDirection.dx == -1)
         {
-            var src = new Rectangle(texW / 2, 0, texW / 2, texH);
-            var dst = new Rectangle(
-                (int)(ecx * sx),
-                (int)((ecy - eyeR) * sy),
-                (int)(eyeR * sx),
-                (int)(eyeD * sy));
-            Renderer.DrawSprite(EyesTexture, dst, src, PlayerEyeColor, 0f, Vector2.Zero);
+            var sourceRectangle = new Rectangle(textureWidth / 2, 0, textureWidth / 2, textureHeight);
+            var destinationRectangle = new Rectangle(
+                (int)(eyeCenterX * horizontalScale),
+                (int)((eyeCenterY - eyeRadius) * verticalScale),
+                (int)(eyeRadius * horizontalScale),
+                (int)(eyeDiameter * verticalScale));
+            Renderer.DrawSprite(EyesTexture, destinationRectangle, sourceRectangle, PlayerEyeColor, 0f, Vector2.Zero);
         }
 
         Renderer.EndDraw();
@@ -361,25 +371,25 @@ public class PacmanPlayerController : com.radiant.engine.core.System
 
     Texture2D CreateMouthTexture(int size)
     {
-        var tex = Renderer.CreateTexture(size, size, SurfaceFormat.Color);
+        var texture = Renderer.CreateTexture(size, size, SurfaceFormat.Color);
         var pixels = new Color[size * size];
-        float half = size / 2f;
-        float originX = half - 4f;
+        float halfSize = size / 2f;
+        float originX = halfSize - 4f;
         float slope = MathF.Tan(MathF.PI * 0.22f);
 
-        for (int y = 0; y < size; y++)
+        for (int pixelY = 0; pixelY < size; pixelY++)
         {
-            for (int x = 0; x < size; x++)
+            for (int pixelX = 0; pixelX < size; pixelX++)
             {
-                float dx = x - originX;
-                float dy = y - half;
+                float horizontalOffset = pixelX - originX;
+                float verticalOffset = pixelY - halfSize;
 
-                if (dx > 0f && MathF.Abs(dy) < slope * dx)
-                    pixels[y * size + x] = new Color((byte)0, (byte)0, (byte)0, (byte)255);
+                if (horizontalOffset > 0f && MathF.Abs(verticalOffset) < slope * horizontalOffset)
+                    pixels[pixelY * size + pixelX] = new Color((byte)0, (byte)0, (byte)0, (byte)255);
             }
         }
 
-        tex.SetData(pixels);
-        return tex;
+        texture.SetData(pixels);
+        return texture;
     }
 }

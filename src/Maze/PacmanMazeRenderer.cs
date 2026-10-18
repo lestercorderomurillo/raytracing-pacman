@@ -11,8 +11,8 @@ namespace RaytracingPacman;
 [SystemTag("Pacman")]
 public class PacmanMazeRenderer : com.radiant.engine.core.System
 {
-    private RenderTarget2D MazeEmissiveRT;
-    private RenderTarget2D MazeAbsorptionRT;
+    private RenderTarget2D MazeEmissiveTarget;
+    private RenderTarget2D MazeAbsorptionTarget;
     private PacmanMazeBuilder Maze;
     private Geometry Geometry;
 
@@ -25,22 +25,25 @@ public class PacmanMazeRenderer : com.radiant.engine.core.System
     public void RenderMaze()
     {
         if (Maze == null || !Maze.HasGrid) return;
+
         DrawMazeToRenderTargets();
     }
 
     public void ClearRenderTargets()
     {
-        MazeEmissiveRT?.Dispose();
-        MazeEmissiveRT = null;
-        MazeAbsorptionRT?.Dispose();
-        MazeAbsorptionRT = null;
+        MazeEmissiveTarget?.Dispose();
+        MazeEmissiveTarget = null;
+
+        MazeAbsorptionTarget?.Dispose();
+        MazeAbsorptionTarget = null;
     }
 
     public override void Render()
     {
         if (Geometry == null) return;
-        Geometry.BackgroundEmissive = MazeEmissiveRT;
-        Geometry.BackgroundAbsorption = MazeAbsorptionRT;
+
+        Geometry.BackgroundEmissive = MazeEmissiveTarget;
+        Geometry.BackgroundAbsorption = MazeAbsorptionTarget;
     }
 
     public override void OnResize()
@@ -55,129 +58,150 @@ public class PacmanMazeRenderer : com.radiant.engine.core.System
 
     private void DrawMazeToRenderTargets()
     {
-        MazeEmissiveRT?.Dispose();
-        MazeAbsorptionRT?.Dispose();
-        MazeEmissiveRT = Renderer.CreateRenderTarget(Renderer.ScreenWidth, Renderer.ScreenHeight);
-        MazeAbsorptionRT = Renderer.CreateRenderTarget(Renderer.ScreenWidth, Renderer.ScreenHeight);
+        MazeEmissiveTarget?.Dispose();
+        MazeAbsorptionTarget?.Dispose();
 
-        var pixel = Renderer.GetSolidTexture(Color.White);
-        int cols = Maze.Cols;
-        int rows = Maze.Rows;
+        MazeEmissiveTarget = Renderer.CreateRenderTarget(Renderer.ScreenWidth, Renderer.ScreenHeight);
+        MazeAbsorptionTarget = Renderer.CreateRenderTarget(Renderer.ScreenWidth, Renderer.ScreenHeight);
+
+        var solidTexture = Renderer.GetSolidTexture(Color.White);
+        int columnCount = Maze.Columns;
+        int rowCount = Maze.Rows;
         float cellSize = Maze.CellSize;
         float offsetX = Maze.OffsetX;
         float offsetY = Maze.OffsetY;
         float wallThickness = Maze.WallThickness;
         float wallMargin = Maze.WallMargin;
 
-        float[] gridX = new float[cols + 1];
-        float[] gridY = new float[rows + 1];
-        for (int i = 0; i <= cols; i++) gridX[i] = offsetX + i * cellSize;
-        for (int i = 0; i <= rows; i++) gridY[i] = offsetY + i * cellSize;
+        float[] gridX = new float[columnCount + 1];
+        float[] gridY = new float[rowCount + 1];
 
-        var fills = new List<Rectangle>();
-        var borders = new List<(Rectangle rect, Color color)>();
+        for (int column = 0; column <= columnCount; column++)
+            gridX[column] = offsetX + column * cellSize;
 
-        for (int y = 0; y < rows; y++)
-            for (int x = 0; x < cols; x++)
+        for (int row = 0; row <= rowCount; row++)
+            gridY[row] = offsetY + row * cellSize;
+
+        var wallFills = new List<Rectangle>();
+        var wallBorders = new List<(Rectangle rect, Color color)>();
+
+        for (int row = 0; row < rowCount; row++)
+            for (int column = 0; column < columnCount; column++)
             {
-                if (!Maze.IsWall(x, y)) continue;
+                if (!Maze.IsWall(column, row)) continue;
 
-                float fx = gridX[x];
-                float fy = gridY[y];
-                float fxr = gridX[x + 1];
-                float fyb = gridY[y + 1];
+                float cellLeft = gridX[column];
+                float cellTop = gridY[row];
+                float cellRight = gridX[column + 1];
+                float cellBottom = gridY[row + 1];
 
-                bool cL = !Maze.IsWall(x - 1, y);
-                bool cR = !Maze.IsWall(x + 1, y);
-                bool cU = !Maze.IsWall(x, y - 1);
-                bool cD = !Maze.IsWall(x, y + 1);
+                bool leftExposed = !Maze.IsWall(column - 1, row);
+                bool rightExposed = !Maze.IsWall(column + 1, row);
+                bool topExposed = !Maze.IsWall(column, row - 1);
+                bool bottomExposed = !Maze.IsWall(column, row + 1);
 
-                float l = fx + (cL ? wallMargin : 0);
-                float t = fy + (cU ? wallMargin : 0);
-                float r = fxr - (cR ? wallMargin : 0);
-                float b = fyb - (cD ? wallMargin : 0);
+                float wallLeft = cellLeft + (leftExposed ? wallMargin : 0);
+                float wallTop = cellTop + (topExposed ? wallMargin : 0);
+                float wallRight = cellRight - (rightExposed ? wallMargin : 0);
+                float wallBottom = cellBottom - (bottomExposed ? wallMargin : 0);
 
-                bool cutTL = !cL && !cU && !Maze.IsWall(x - 1, y - 1);
-                bool cutTR = !cR && !cU && !Maze.IsWall(x + 1, y - 1);
-                bool cutBL = !cL && !cD && !Maze.IsWall(x - 1, y + 1);
-                bool cutBR = !cR && !cD && !Maze.IsWall(x + 1, y + 1);
+                bool cutTopLeft = !leftExposed && !topExposed && !Maze.IsWall(column - 1, row - 1);
+                bool cutTopRight = !rightExposed && !topExposed && !Maze.IsWall(column + 1, row - 1);
+                bool cutBottomLeft = !leftExposed && !bottomExposed && !Maze.IsWall(column - 1, row + 1);
+                bool cutBottomRight = !rightExposed && !bottomExposed && !Maze.IsWall(column + 1, row + 1);
 
-                if (!cutTL && !cutTR && !cutBL && !cutBR)
+                if (!cutTopLeft && !cutTopRight && !cutBottomLeft && !cutBottomRight)
                 {
-                    fills.Add(Renderer.VirtualToScreenRect(l, t, r - l, b - t));
+                    wallFills.Add(Renderer.VirtualToScreenRect(wallLeft, wallTop, wallRight - wallLeft, wallBottom - wallTop));
                 }
                 else
                 {
-                    float cy1 = fy + wallMargin;
-                    float cy2 = fyb - wallMargin;
-                    if (t < cy1)
+                    float innerTop = cellTop + wallMargin;
+                    float innerBottom = cellBottom - wallMargin;
+
+                    if (wallTop < innerTop)
                     {
-                        float sl = cutTL ? fx + wallMargin : l;
-                        float sr = cutTR ? fxr - wallMargin : r;
-                        fills.Add(Renderer.VirtualToScreenRect(sl, t, sr - sl, cy1 - t));
+                        float segmentLeft = cutTopLeft ? cellLeft + wallMargin : wallLeft;
+                        float segmentRight = cutTopRight ? cellRight - wallMargin : wallRight;
+                        wallFills.Add(Renderer.VirtualToScreenRect(segmentLeft, wallTop, segmentRight - segmentLeft, innerTop - wallTop));
                     }
-                    if (cy1 < cy2)
-                        fills.Add(Renderer.VirtualToScreenRect(l, cy1, r - l, cy2 - cy1));
-                    if (cy2 < b)
+
+                    if (innerTop < innerBottom)
+                        wallFills.Add(Renderer.VirtualToScreenRect(wallLeft, innerTop, wallRight - wallLeft, innerBottom - innerTop));
+
+                    if (innerBottom < wallBottom)
                     {
-                        float sl = cutBL ? fx + wallMargin : l;
-                        float sr = cutBR ? fxr - wallMargin : r;
-                        fills.Add(Renderer.VirtualToScreenRect(sl, cy2, sr - sl, b - cy2));
+                        float segmentLeft = cutBottomLeft ? cellLeft + wallMargin : wallLeft;
+                        float segmentRight = cutBottomRight ? cellRight - wallMargin : wallRight;
+                        wallFills.Add(Renderer.VirtualToScreenRect(segmentLeft, innerBottom, segmentRight - segmentLeft, wallBottom - innerBottom));
                     }
                 }
 
-                if (!cL && !cR && !cU && !cD && !cutTL && !cutTR && !cutBL && !cutBR) continue;
-                Color color = Maze.GetWallColor(x, y);
+                if (!leftExposed && !rightExposed && !topExposed && !bottomExposed && !cutTopLeft && !cutTopRight && !cutBottomLeft && !cutBottomRight) continue;
 
-                if (cU)
-                    borders.Add((Renderer.VirtualToScreenRect(l, t - wallThickness, r - l, wallThickness), color));
-                if (cD)
-                    borders.Add((Renderer.VirtualToScreenRect(l, b, r - l, wallThickness), color));
-                if (cL)
+                Color color = Maze.GetWallColor(column, row);
+
+                if (topExposed)
+                    wallBorders.Add((Renderer.VirtualToScreenRect(wallLeft, wallTop - wallThickness, wallRight - wallLeft, wallThickness), color));
+                if (bottomExposed)
+                    wallBorders.Add((Renderer.VirtualToScreenRect(wallLeft, wallBottom, wallRight - wallLeft, wallThickness), color));
+
+                if (leftExposed)
                 {
-                    float vt = cU ? t - wallThickness : t;
-                    float vb = cD ? b + wallThickness : b;
-                    borders.Add((Renderer.VirtualToScreenRect(l - wallThickness, vt, wallThickness, vb - vt), color));
-                }
-                if (cR)
-                {
-                    float vt = cU ? t - wallThickness : t;
-                    float vb = cD ? b + wallThickness : b;
-                    borders.Add((Renderer.VirtualToScreenRect(r, vt, wallThickness, vb - vt), color));
+                    float segmentTop = topExposed ? wallTop - wallThickness : wallTop;
+                    float segmentBottom = bottomExposed ? wallBottom + wallThickness : wallBottom;
+                    wallBorders.Add((Renderer.VirtualToScreenRect(wallLeft - wallThickness, segmentTop, wallThickness, segmentBottom - segmentTop), color));
                 }
 
-                if (cutTL)
+                if (rightExposed)
                 {
-                    borders.Add((Renderer.VirtualToScreenRect(fx, fy + wallMargin - wallThickness, wallMargin, wallThickness), color));
-                    borders.Add((Renderer.VirtualToScreenRect(fx + wallMargin - wallThickness, fy, wallThickness, wallMargin - wallThickness), color));
+                    float segmentTop = topExposed ? wallTop - wallThickness : wallTop;
+                    float segmentBottom = bottomExposed ? wallBottom + wallThickness : wallBottom;
+                    wallBorders.Add((Renderer.VirtualToScreenRect(wallRight, segmentTop, wallThickness, segmentBottom - segmentTop), color));
                 }
-                if (cutTR)
+
+                if (cutTopLeft)
                 {
-                    borders.Add((Renderer.VirtualToScreenRect(fxr - wallMargin, fy + wallMargin - wallThickness, wallMargin, wallThickness), color));
-                    borders.Add((Renderer.VirtualToScreenRect(fxr - wallMargin, fy, wallThickness, wallMargin - wallThickness), color));
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellLeft, cellTop + wallMargin - wallThickness, wallMargin, wallThickness), color));
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellLeft + wallMargin - wallThickness, cellTop, wallThickness, wallMargin - wallThickness), color));
                 }
-                if (cutBL)
+
+                if (cutTopRight)
                 {
-                    borders.Add((Renderer.VirtualToScreenRect(fx, fyb - wallMargin, wallMargin, wallThickness), color));
-                    borders.Add((Renderer.VirtualToScreenRect(fx + wallMargin - wallThickness, fyb - wallMargin + wallThickness, wallThickness, wallMargin - wallThickness), color));
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellRight - wallMargin, cellTop + wallMargin - wallThickness, wallMargin, wallThickness), color));
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellRight - wallMargin, cellTop, wallThickness, wallMargin - wallThickness), color));
                 }
-                if (cutBR)
+
+                if (cutBottomLeft)
                 {
-                    borders.Add((Renderer.VirtualToScreenRect(fxr - wallMargin, fyb - wallMargin, wallMargin, wallThickness), color));
-                    borders.Add((Renderer.VirtualToScreenRect(fxr - wallMargin, fyb - wallMargin + wallThickness, wallThickness, wallMargin - wallThickness), color));
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellLeft, cellBottom - wallMargin, wallMargin, wallThickness), color));
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellLeft + wallMargin - wallThickness, cellBottom - wallMargin + wallThickness, wallThickness, wallMargin - wallThickness), color));
+                }
+
+                if (cutBottomRight)
+                {
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellRight - wallMargin, cellBottom - wallMargin, wallMargin, wallThickness), color));
+                    wallBorders.Add((Renderer.VirtualToScreenRect(cellRight - wallMargin, cellBottom - wallMargin + wallThickness, wallThickness, wallMargin - wallThickness), color));
                 }
             }
 
-        Renderer.Reset().Configure(BlendState.Opaque).SetTarget(MazeAbsorptionRT).Clear(Color.Transparent);
-        for (int i = 0; i < fills.Count; i++)
-            Renderer.DrawTexture(pixel, fills[i], Color.White);
-        for (int i = 0; i < borders.Count; i++)
-            Renderer.DrawTexture(pixel, borders[i].rect, borders[i].color);
+        // Draw wall absorption.
+        Renderer.Reset().Configure(BlendState.Opaque).SetTarget(MazeAbsorptionTarget).Clear(Color.Transparent);
+
+        for (int fillIndex = 0; fillIndex < wallFills.Count; fillIndex++)
+            Renderer.DrawTexture(solidTexture, wallFills[fillIndex], Color.White);
+
+        for (int borderIndex = 0; borderIndex < wallBorders.Count; borderIndex++)
+            Renderer.DrawTexture(solidTexture, wallBorders[borderIndex].rect, wallBorders[borderIndex].color);
+
         Renderer.Commit();
 
-        Renderer.Reset().Configure(BlendState.Opaque).SetTarget(MazeEmissiveRT).Clear(Color.Transparent);
-        for (int i = 0; i < borders.Count; i++)
-            Renderer.DrawTexture(pixel, borders[i].rect, borders[i].color);
+        // Draw emissive wall borders.
+        Renderer.Reset().Configure(BlendState.Opaque).SetTarget(MazeEmissiveTarget).Clear(Color.Transparent);
+
+        for (int borderIndex = 0; borderIndex < wallBorders.Count; borderIndex++)
+            Renderer.DrawTexture(solidTexture, wallBorders[borderIndex].rect, wallBorders[borderIndex].color);
+
         Renderer.Commit();
 
         Renderer.SetTarget(null);

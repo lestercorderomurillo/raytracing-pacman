@@ -1,5 +1,7 @@
 # Raytracing Pac-Man
 
+Follow [AGENTS.md](AGENTS.md) for coding style: use descriptive variable names, separate logical chunks with one blank line, use four-space indentation, and keep comments short and sparse. Mechanical whitespace settings live in `.editorconfig`.
+
 C#/.NET 8 game consumer of the sibling `../radiant-game-engine` library. `RadiantRoot` overrides that path. The engine's `eng/Radiant.Desktop.props` pins MonoGame 3.8.6 DesktopVK. Keep the local MGCB tool manifest at the same version.
 
 - Keep engine code, shared shaders, and engine test scenes in Radiant; this repo owns Pac-Man scenes, maze code, player/ghost logic, HUD, Ghost/Eyes textures, and PressStart2P.ttf.

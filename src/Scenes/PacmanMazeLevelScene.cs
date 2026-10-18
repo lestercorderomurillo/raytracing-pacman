@@ -9,7 +9,7 @@ namespace RaytracingPacman;
 
 public class PacmanMazeLevelScene : Scene
 {
-    private SystemGroup GIGroup;
+    private SystemGroup LightingGroup;
     private SystemGroup UpscalerGroup;
     private bool UpscalerEnabled = true;
     private ColorManagement Tonemapper;
@@ -75,7 +75,6 @@ public class PacmanMazeLevelScene : Scene
         {
             Tag = "1-1",
             Layout = PacmanLayout,
-            WallAlbedo = new Color((byte)0, (byte)0, (byte)40, (byte)255),
             WallEmissive = new Color((byte)90, (byte)45, (byte)160, (byte)170),
             CoinColor = new Color(225, 180, 35),
             PowerPelletCells = [(1, 3), (26, 3), (1, 23), (26, 23)],
@@ -95,7 +94,6 @@ public class PacmanMazeLevelScene : Scene
             Tag = "1-2",
             Procedural = true,
             MazeSeed = 2482,
-            WallAlbedo = new Color(0, 0, 55),
             WallEmissive = new Color(56, 84, 107),
             CoinColor = new Color(102, 210, 227),
             FrightenedDuration = 5f,
@@ -113,7 +111,6 @@ public class PacmanMazeLevelScene : Scene
             Tag = "1-3",
             Procedural = true,
             MazeSeed = 1344,
-            WallAlbedo = new Color(30, 30, 20),
             WallEmissive = new Color(39, 38, 36),
             CoinColor = new Color(187, 186, 147),
             FrightenedDuration = 5f,
@@ -132,7 +129,6 @@ public class PacmanMazeLevelScene : Scene
             Tag = "1-4",
             Procedural = true,
             MazeSeed = 1235,
-            WallAlbedo = new Color(101, 61, 65),
             WallEmissive = new Color(53, 106, 74),
             CoinColor = new Color(183, 199, 65),
             FrightenedDuration = 7f,
@@ -150,7 +146,6 @@ public class PacmanMazeLevelScene : Scene
             Tag = "2-1",
             Procedural = true,
             MazeSeed = 7131,
-            WallAlbedo = new Color(38, 16, 25),
             WallEmissive = new Color(79, 43, 123),
             CoinColor = new Color(69, 186, 163),
             FrightenedDuration = 4f,
@@ -169,7 +164,6 @@ public class PacmanMazeLevelScene : Scene
             Tag = "2-2",
             Procedural = true,
             MazeSeed = 8264,
-            WallAlbedo = new Color(55, 5, 5),
             WallEmissive = new Color(20, 0, 0),
             CoinColor = new Color(236, 37, 0),
             FrightenedDuration = 3f,
@@ -187,15 +181,16 @@ public class PacmanMazeLevelScene : Scene
     {
         UDRQuality.Set(2); // Native resolution keeps small-window lighting and characters sharp.
         Renderer.LoadFont("PressStart2P", "fonts/PressStart2P.ttf");
+
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<PerformanceMonitor>();
         ECS.AddSystem<Geometry>();
 
-        GIGroup = new SystemGroup("GI",
+        LightingGroup = new SystemGroup("GI",
             ("Holographic Radiance Cascades", ECS.AddSystem<HRCGI>()),
             ("Radiance Cascades", ECS.AddSystem<RCGI>(enabled: false))
         );
-        ECS.RegisterSystemGroup(GIGroup);
+        ECS.RegisterSystemGroup(LightingGroup);
 
         Tonemapper = ECS.AddSystem<ColorManagement>();
 
@@ -245,8 +240,8 @@ public class PacmanMazeLevelScene : Scene
         Inspector.AddSectionLabel("scene", "debugHeader", "Debugging");
         Inspector.AddButton("scene", "spawnDummy", "Spawn Dummy Entities", () =>
         {
-            foreach (int id in LightFactory.SpawnRandom(ECS, 100_000, Renderer.VirtualSize))
-                ECS.AddTag(id, "dummy");
+            foreach (int entityId in LightFactory.SpawnRandom(ECS, 100_000, Renderer.VirtualSize))
+                ECS.AddTag(entityId, "dummy");
         });
         Inspector.AddButton("scene", "destroyDummy", "Destroy Dummy Entities", () => ECS.DestroyEntitiesWithTag("dummy"));
 
@@ -263,9 +258,9 @@ public class PacmanMazeLevelScene : Scene
             UpdateUpscalerInput();
             UpdateWindowVisibility();
         });
-        Inspector.AddDropdown("pipeline", "lighting", "Lighting", GIGroup.Names, GIGroup.ActiveIdx, (index) =>
+        Inspector.AddDropdown("pipeline", "lighting", "Lighting", LightingGroup.Names, LightingGroup.ActiveIdx, (index) =>
         {
-            GIGroup.SetActive(index);
+            LightingGroup.SetActive(index);
             UpdateUpscalerInput();
             UpdateWindowVisibility();
         });
@@ -293,10 +288,11 @@ public class PacmanMazeLevelScene : Scene
         Maze.ClearCoins();
         MazeRenderer.ClearRenderTargets();
         Maze.ClearMaze();
+
         LoadLevel(CurrentLevel);
     }
 
-    private void LoadLevel(int index)
+    private void LoadLevel(int levelIndex)
     {
         GhostAI.Clear();
         GhostAI.ClearRainbow();
@@ -305,66 +301,76 @@ public class PacmanMazeLevelScene : Scene
         MazeRenderer.ClearRenderTargets();
         Maze.ClearMaze();
 
-        CurrentLevel = index;
-        var config = Levels[index];
-        float scale = 0.92f;
+        CurrentLevel = levelIndex;
+        var levelConfig = Levels[levelIndex];
+        float levelScale = 0.92f;
 
-        Maze.Layout = config.Procedural
-            ? PacmanMazeGenerator.Generate(index + config.MazeSeed)
-            : config.Layout;
-        Maze.CellSize = 70f * scale;
-        Maze.WallColor = config.WallAlbedo;
-        Maze.WallLight = config.WallEmissive;
-        Maze.GhostHouse = config.GhostHouse;
-        Maze.NoUpTiles = config.NoUpTiles;
+        Maze.Layout = levelConfig.Procedural
+            ? PacmanMazeGenerator.Generate(levelIndex + levelConfig.MazeSeed)
+            : levelConfig.Layout;
+        Maze.CellSize = 70f * levelScale;
+        Maze.WallLight = levelConfig.WallEmissive;
+        Maze.GhostHouse = levelConfig.GhostHouse;
+        Maze.NoUpTiles = levelConfig.NoUpTiles;
+
         Maze.BuildMaze();
-        Renderer.FitWorld(Renderer.VirtualSize / 2f, new Vector2(Maze.Cols * Maze.CellSize + 160f, Renderer.VirtualHeight));
+        Renderer.FitWorld(Renderer.VirtualSize / 2f, new Vector2(Maze.Columns * Maze.CellSize + 160f, Renderer.VirtualHeight));
         MazeRenderer.RenderMaze();
 
-        Maze.SpawnCoins(config.CoinRadius * scale, config.CoinColor, 1f, config.PlayerStartCell);
-        var pelletPositions = config.PowerPelletCells ?? Maze.FindCornerPelletPositions();
+        Maze.SpawnCoins(levelConfig.CoinRadius * levelScale, levelConfig.CoinColor, 1f, levelConfig.PlayerStartCell);
+        var pelletPositions = levelConfig.PowerPelletCells ?? Maze.FindCornerPelletPositions();
         if (pelletPositions.Length > 0)
-            Maze.SpawnPowerPellets(pelletPositions, config.PowerPelletRadius * scale, config.PowerPelletColor, 1f);
-        BaseCoinColor = config.CoinColor;
-        BasePowerPelletColor = config.PowerPelletColor;
+            Maze.SpawnPowerPellets(pelletPositions, levelConfig.PowerPelletRadius * levelScale, levelConfig.PowerPelletColor, 1f);
+
+        BaseCoinColor = levelConfig.CoinColor;
+        BasePowerPelletColor = levelConfig.PowerPelletColor;
 
         var ghostTexture = Renderer.GetTexture("Ghost");
-        float bodyRadius = 28.5f * scale;
+        float bodyRadius = 28.5f * levelScale;
 
         int rainbowIndex = -1;
-        for (int i = 0; i < config.Ghosts.Length; i++)
-            if (config.Ghosts[i].Type == PacmanGhostType.Rainbow) { rainbowIndex = i; break; }
+
+        for (int ghostIndex = 0; ghostIndex < levelConfig.Ghosts.Length; ghostIndex++)
+            if (levelConfig.Ghosts[ghostIndex].Type == PacmanGhostType.Rainbow)
+            {
+                rainbowIndex = ghostIndex;
+                break;
+            }
+
         bool hasRainbow = rainbowIndex >= 0;
 
-        int regularCount = hasRainbow ? config.Ghosts.Length - 1 : config.Ghosts.Length;
-        if (regularCount > 0)
-        {
-            var regularEntries = new GhostEntry[regularCount];
-            var startCells = new (int x, int y)[regularCount];
-            var colors = new Color[regularCount];
+        int regularGhostCount = hasRainbow ? levelConfig.Ghosts.Length - 1 : levelConfig.Ghosts.Length;
 
-            int regularIndex = 0;
-            for (int i = 0; i < config.Ghosts.Length; i++)
+        if (regularGhostCount > 0)
+        {
+            var regularGhostEntries = new GhostEntry[regularGhostCount];
+            var startCells = new (int x, int y)[regularGhostCount];
+            var colors = new Color[regularGhostCount];
+
+            int regularGhostIndex = 0;
+
+            for (int ghostIndex = 0; ghostIndex < levelConfig.Ghosts.Length; ghostIndex++)
             {
-                if (config.Ghosts[i].Type == PacmanGhostType.Rainbow) continue;
-                regularEntries[regularIndex] = config.Ghosts[i];
-                startCells[regularIndex] = config.Ghosts[i].StartCell
-                    ?? DefaultGhostHouseCells[i % DefaultGhostHouseCells.Length];
-                colors[regularIndex] = PacmanGhostAI.PersonalityColor(config.Ghosts[i].Type);
-                regularIndex++;
+                if (levelConfig.Ghosts[ghostIndex].Type == PacmanGhostType.Rainbow) continue;
+
+                regularGhostEntries[regularGhostIndex] = levelConfig.Ghosts[ghostIndex];
+                startCells[regularGhostIndex] = levelConfig.Ghosts[ghostIndex].StartCell
+                    ?? DefaultGhostHouseCells[ghostIndex % DefaultGhostHouseCells.Length];
+                colors[regularGhostIndex] = PacmanGhostAI.PersonalityColor(levelConfig.Ghosts[ghostIndex].Type);
+                regularGhostIndex++;
             }
 
             var ghostIds = Maze.SpawnAtCells(startCells, colors, bodyRadius, 65530f, ghostTexture);
 
             GhostAI.BodyTexture = ghostTexture;
             GhostAI.BodyRadius = bodyRadius;
-            GhostAI.GhostSpeed = config.GhostSpeed * scale;
-            GhostAI.Track(ghostIds, startCells, regularEntries);
+            GhostAI.GhostSpeed = levelConfig.GhostSpeed * levelScale;
+            GhostAI.Track(ghostIds, startCells, regularGhostEntries);
         }
 
         if (hasRainbow)
         {
-            var rainbowEntry = config.Ghosts[rainbowIndex];
+            var rainbowEntry = levelConfig.Ghosts[rainbowIndex];
             var rainbowCell = rainbowEntry.StartCell
                 ?? DefaultGhostHouseCells[rainbowIndex % DefaultGhostHouseCells.Length];
             var rainbowCenter = Maze.CellCenter(rainbowCell.x, rainbowCell.y);
@@ -376,11 +382,11 @@ public class PacmanMazeLevelScene : Scene
 
             GhostAI.BodyTexture = ghostTexture;
             GhostAI.BodyRadius = bodyRadius;
-            GhostAI.RainbowSpeed = config.RainbowSpeed * scale;
+            GhostAI.RainbowSpeed = levelConfig.RainbowSpeed * levelScale;
             GhostAI.TrackRainbow(rainbowId, rainbowCell, rainbowEntry.ReleaseAfter, rainbowEntry.ReleaseAtCoinPercent);
         }
 
-        var playerCell = config.PlayerStartCell;
+        var playerCell = levelConfig.PlayerStartCell;
         var playerColor = new Color(255, 210, 30);
         var playerEmissive = new Color((byte)255, (byte)220, (byte)50, (byte)255);
         var playerCenter = Maze.CellCenter(playerCell.x, playerCell.y);
@@ -389,12 +395,12 @@ public class PacmanMazeLevelScene : Scene
             playerColor, playerEmissive, 65530f);
         ECS.AddComponent<MotionTrackable>(playerId);
 
-        PlayerController.Speed = config.GhostSpeed * scale;
-        PlayerController.LevelTag = config.Tag;
+        PlayerController.Speed = levelConfig.GhostSpeed * levelScale;
+        PlayerController.LevelTag = levelConfig.Tag;
         PlayerController.Track(playerId, playerCell, 65530f);
-        PlayerController.CoinColor = config.CoinColor;
+        PlayerController.CoinColor = levelConfig.CoinColor;
         PlayerController.GhostAI = GhostAI;
-        PlayerController.FrightenedDuration = config.FrightenedDuration;
+        PlayerController.FrightenedDuration = levelConfig.FrightenedDuration;
 
         GhostAI.Player = PlayerController;
     }
@@ -402,22 +408,26 @@ public class PacmanMazeLevelScene : Scene
     public override void Update()
     {
         bool ghostEnabled = GhostAI.Enabled;
+
         if (ghostEnabled != GhostAIWasEnabled)
         {
             if (ghostEnabled)
                 GhostAI.ShowGhostEntities();
             else
                 GhostAI.HideGhostEntities();
+
             GhostAIWasEnabled = ghostEnabled;
         }
 
         bool playerEnabled = PlayerController.Enabled;
+
         if (playerEnabled != PlayerWasEnabled)
         {
             if (playerEnabled)
                 PlayerController.ShowPlayer();
             else
                 PlayerController.HidePlayer();
+
             PlayerWasEnabled = playerEnabled;
         }
 
@@ -436,7 +446,7 @@ public class PacmanMazeLevelScene : Scene
         if (ECS.AnimationPaused) return;
 
         CoinWaveTime += (float)GameTime.ElapsedGameTime.TotalSeconds;
-        var playerPos = PlayerController.WorldPosition;
+        var playerPosition = PlayerController.WorldPosition;
         const float attractRadius = 200f;
         const float attractStrength = 0.25f;
         const float glowRadius = 300f;
@@ -444,37 +454,39 @@ public class PacmanMazeLevelScene : Scene
         foreach (var (cell, coinId) in Maze.CoinCells)
         {
             if (!ECS.IsAlive(coinId)) continue;
+
             float phase = CoinWaveTime * 1.8f - cell.Item1 * 0.5f;
-            float sinVal = MathF.Sin(phase);
-            float wave = 0.85f + 0.15f * sinVal;
+            float waveSine = MathF.Sin(phase);
+            float wave = 0.85f + 0.15f * waveSine;
 
-            var basePos = Maze.CellCenter(cell.Item1, cell.Item2);
-            float coinX = basePos.X;
-            float coinY = basePos.Y + 4.5f * MathF.Sin(phase);
+            var cellCenter = Maze.CellCenter(cell.Item1, cell.Item2);
+            float coinX = cellCenter.X;
+            float coinY = cellCenter.Y + 4.5f * MathF.Sin(phase);
 
-            float dx = playerPos.X - coinX;
-            float dy = playerPos.Y - coinY;
-            float dist = MathF.Sqrt(dx * dx + dy * dy);
+            float playerOffsetX = playerPosition.X - coinX;
+            float playerOffsetY = playerPosition.Y - coinY;
+            float playerDistance = MathF.Sqrt(playerOffsetX * playerOffsetX + playerOffsetY * playerOffsetY);
 
             float proximity = 0f;
-            if (dist < attractRadius && dist > 0.1f)
+
+            if (playerDistance < attractRadius && playerDistance > 0.1f)
             {
-                proximity = 1f - dist / attractRadius;
+                proximity = 1f - playerDistance / attractRadius;
                 float pull = proximity * attractStrength;
-                coinX += dx * pull;
-                coinY += dy * pull;
+                coinX += playerOffsetX * pull;
+                coinY += playerOffsetY * pull;
             }
 
-            float glow = dist < glowRadius ? 1f - dist / glowRadius : 0f;
+            float glow = playerDistance < glowRadius ? 1f - playerDistance / glowRadius : 0f;
             glow *= glow;
-            float bright = wave * (1f - glow) + 1.0f * glow + proximity * 0.6f;
-            byte alpha = (byte)(BaseCoinColor.A * ((0.9f + 0.1f * sinVal) * (1f - glow) + glow));
+            float brightness = wave * (1f - glow) + 1.0f * glow + proximity * 0.6f;
+            byte alpha = (byte)(BaseCoinColor.A * ((0.9f + 0.1f * waveSine) * (1f - glow) + glow));
 
-            ref var coinMat = ref ECS.GetComponent<Material>(coinId);
-            coinMat.Emissive = new Color(
-                (byte)MathF.Min(BaseCoinColor.R * bright, 255f),
-                (byte)MathF.Min(BaseCoinColor.G * bright, 255f),
-                (byte)MathF.Min(BaseCoinColor.B * bright, 255f),
+            ref var coinMaterial = ref ECS.GetComponent<Material>(coinId);
+            coinMaterial.Emissive = new Color(
+                (byte)MathF.Min(BaseCoinColor.R * brightness, 255f),
+                (byte)MathF.Min(BaseCoinColor.G * brightness, 255f),
+                (byte)MathF.Min(BaseCoinColor.B * brightness, 255f),
                 alpha);
 
             ref var coinTransform = ref ECS.GetComponent<Transform>(coinId);
@@ -487,36 +499,38 @@ public class PacmanMazeLevelScene : Scene
         foreach (var (cell, pelletId) in Maze.PowerPelletCells)
         {
             if (!ECS.IsAlive(pelletId)) continue;
+
             float phase = CoinWaveTime * 1.8f - cell.Item1 * 0.5f;
 
-            var basePos = Maze.CellCenter(cell.Item1, cell.Item2);
-            float pelletX = basePos.X + 3f * MathF.Sin(phase * 1.3f + 0.7f);
-            float pelletY = basePos.Y + 6f * MathF.Sin(phase);
+            var cellCenter = Maze.CellCenter(cell.Item1, cell.Item2);
+            float pelletX = cellCenter.X + 3f * MathF.Sin(phase * 1.3f + 0.7f);
+            float pelletY = cellCenter.Y + 6f * MathF.Sin(phase);
 
-            float dx = playerPos.X - pelletX;
-            float dy = playerPos.Y - pelletY;
-            float dist = MathF.Sqrt(dx * dx + dy * dy);
+            float playerOffsetX = playerPosition.X - pelletX;
+            float playerOffsetY = playerPosition.Y - pelletY;
+            float playerDistance = MathF.Sqrt(playerOffsetX * playerOffsetX + playerOffsetY * playerOffsetY);
 
             float proximity = 0f;
-            if (dist < attractRadius && dist > 0.1f)
+
+            if (playerDistance < attractRadius && playerDistance > 0.1f)
             {
-                proximity = 1f - dist / attractRadius;
+                proximity = 1f - playerDistance / attractRadius;
                 float pull = proximity * attractStrength;
-                pelletX += dx * pull;
-                pelletY += dy * pull;
+                pelletX += playerOffsetX * pull;
+                pelletY += playerOffsetY * pull;
             }
 
-            float bright = 1f + proximity * 0.6f;
+            float brightness = 1f + proximity * 0.6f;
 
             float hue = (CoinWaveTime * 2.5f + cell.Item1 * 0.7f) % 1f;
             Color rainbow = LightFactory.HueToRGB(hue);
             const float tint = 0.15f;
 
-            ref var pelletMat = ref ECS.GetComponent<Material>(pelletId);
-            pelletMat.Emissive = new Color(
-                (byte)MathF.Min((255f * (1f - tint) + rainbow.R * tint) * bright, 255f),
-                (byte)MathF.Min((255f * (1f - tint) + rainbow.G * tint) * bright, 255f),
-                (byte)MathF.Min((255f * (1f - tint) + rainbow.B * tint) * bright, 255f),
+            ref var pelletMaterial = ref ECS.GetComponent<Material>(pelletId);
+            pelletMaterial.Emissive = new Color(
+                (byte)MathF.Min((255f * (1f - tint) + rainbow.R * tint) * brightness, 255f),
+                (byte)MathF.Min((255f * (1f - tint) + rainbow.G * tint) * brightness, 255f),
+                (byte)MathF.Min((255f * (1f - tint) + rainbow.B * tint) * brightness, 255f),
                 BasePowerPelletColor.A);
 
             ref var pelletTransform = ref ECS.GetComponent<Transform>(pelletId);
@@ -531,11 +545,11 @@ public class PacmanMazeLevelScene : Scene
 
     private void UpdateUpscalerInput()
     {
-        Func<Texture2D> giSource = () =>
-            GIGroup.Active is HRCGI hrcgi ? hrcgi.GetOutput() :
-            GIGroup.Active is RCGI rcgi ? rcgi.GetOutput() : null;
+        Func<Texture2D> lightingSource = () =>
+            LightingGroup.Active is HRCGI holographicLighting ? holographicLighting.GetOutput() :
+            LightingGroup.Active is RCGI radianceLighting ? radianceLighting.GetOutput() : null;
 
-        Tonemapper.SetInputSource(giSource);
+        Tonemapper.SetInputSource(lightingSource);
 
         Func<Texture2D> colorOutput = Tonemapper.GetOutput;
 
@@ -543,9 +557,9 @@ public class PacmanMazeLevelScene : Scene
         {
             switch (system)
             {
-                case UDR1 udr1: udr1.SetInputSource(colorOutput); break;
-                case UDR2 udr2: udr2.SetInputSource(colorOutput); break;
-                case UDR3 udr3: udr3.SetInputSource(colorOutput); break;
+                case UDR1 firstUpscaler: firstUpscaler.SetInputSource(colorOutput); break;
+                case UDR2 secondUpscaler: secondUpscaler.SetInputSource(colorOutput); break;
+                case UDR3 thirdUpscaler: thirdUpscaler.SetInputSource(colorOutput); break;
             }
         });
     }
@@ -564,12 +578,13 @@ public class PacmanMazeLevelScene : Scene
             if (UpscalerGroup.Active != null) UpscalerGroup.Active.Enabled = false;
             Renderer.RenderScale = 1.0f;
         }
+
         UpdateWindowVisibility();
     }
 
     private void UpdateWindowVisibility()
     {
-        if (GIGroup.Active is HRCGI)
+        if (LightingGroup.Active is HRCGI)
             Inspector.HideWindow("rcgi");
         else
             Inspector.HideWindow("hrcgi");

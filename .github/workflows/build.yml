@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Check C# formatting
+        run: git ls-files -z '*.cs' | xargs -0 dotnet format whitespace . --folder --verify-no-changes --include
+        working-directory: raytracing-pacman
       - run: dotnet build -c Release
         working-directory: raytracing-pacman
       - run: dotnet run --project tests/Pacman.Tests -c Release

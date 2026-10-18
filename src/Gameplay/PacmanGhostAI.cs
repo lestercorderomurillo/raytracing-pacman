@@ -12,23 +12,21 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 {
     public float GhostSpeed { get; set; } = 200f;
     public float RainbowSpeed { get; set; } = 200f;
-    public float GhostZ { get; set; } = 65530f;
+    public float GhostDepth { get; set; } = 65530f;
     public Texture2D BodyTexture { get; set; }
     public float BodyRadius { get; set; } = 30f;
-    public float DefaultReleaseInterval { get; set; } = 0.5f;
     public PacmanPlayerController Player { get; set; }
 
     public int GhostCount => GhostIds?.Length ?? 0;
-    public Vector2 GetGhostEyePosition(int Index) => EyePositions[Index];
-    public (int dx, int dy) GetGhostDir(int Index) => GhostDirs[Index];
-    public bool IsGhostFrightened(int Index) => Frightened[Index];
-    public bool IsGhostEaten(int Index) => Eaten[Index];
-    public PacmanGhostType GetGhostType(int Index) => GhostEntries[Index].Type;
+    public Vector2 GetGhostEyePosition(int ghostIndex) => EyePositions[ghostIndex];
+    public (int dx, int dy) GetGhostDirection(int ghostIndex) => GhostDirections[ghostIndex];
+    public bool IsGhostFrightened(int ghostIndex) => Frightened[ghostIndex];
+    public bool IsGhostEaten(int ghostIndex) => Eaten[ghostIndex];
+    public PacmanGhostType GetGhostType(int ghostIndex) => GhostEntries[ghostIndex].Type;
 
-    public bool RainbowActive => RainbowInitialized;
     public int RainbowTotalCount => RainbowInitialized ? 1 + RainbowCloneCount : 0;
-    public Vector2 GetRainbowEyePosition(int Index) => RainbowEyePositions[Index];
-    public (int dx, int dy) GetRainbowEyeDir(int Index) => RainbowEyeDirs[Index];
+    public Vector2 GetRainbowEyePosition(int eyeIndex) => RainbowEyePositions[eyeIndex];
+    public (int dx, int dy) GetRainbowEyeDirection(int eyeIndex) => RainbowEyeDirections[eyeIndex];
     public bool RainbowIsMainEaten => RainbowMainEaten;
     public bool RainbowIsFrightened => RainbowFrightenedTimer > 0f;
 
@@ -42,15 +40,15 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     private static readonly Color FrightenedColor = new Color(30, 30, 200);
     private static readonly Color FrightenedBlinkColor = new Color(100, 150, 255);
 
-    private static readonly int[] DXs = [0, -1, 0, 1];
-    private static readonly int[] DYs = [-1, 0, 1, 0];
+    private static readonly int[] HorizontalDirections = [0, -1, 0, 1];
+    private static readonly int[] VerticalDirections = [-1, 0, 1, 0];
 
     private int[] GhostIds;
     private PacmanMazeBuilder Maze;
     private Geometry Geometry;
     private (int x, int y)[] GhostCells;
     private (int x, int y)[] GhostTargets;
-    private (int dx, int dy)[] GhostDirs;
+    private (int dx, int dy)[] GhostDirections;
     private GhostEntry[] GhostEntries;
     private (int x, int y)[] ChaseTargets;
     private bool[] ExitedHouse;
@@ -58,11 +56,11 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     private float[] RespawnTimer;
     private Color[] GhostColors;
     private Vector2[] EyePositions;
-    private Vector2[] PrevPositions;
+    private Vector2[] PreviousPositions;
     private Vector2[] Positions;
     private float ElapsedTime;
     private float IdleTime;
-    private Random Rng = new();
+    private Random RandomGenerator = new();
 
     private PacmanGhostMode CurrentMode = PacmanGhostMode.Scatter;
     private float ModeTimer;
@@ -86,25 +84,24 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     private const float SoloDuration = 5f;
     private const float DuoSplitDelay = 3f;
     private const float TrioDuration = 7f;
-    private static readonly float[] MergeSpeedMults = [1.8f, 1.5f, 1.3f];
+    private static readonly float[] MergeSpeedMultipliers = [1.8f, 1.5f, 1.3f];
     private const float HueCycleSpeed = 0.35f;
 
     private int RainbowMainId;
     private (int x, int y) RainbowMainCell;
     private (int x, int y) RainbowMainTarget;
-    private (int dx, int dy) RainbowMainDir;
+    private (int dx, int dy) RainbowMainDirection;
     private float RainbowMainHue;
 
     private int[] RainbowCloneIds = new int[MaxClones];
     private (int x, int y)[] RainbowCloneCells = new (int, int)[MaxClones];
     private (int x, int y)[] RainbowCloneTargets = new (int, int)[MaxClones];
-    private (int dx, int dy)[] RainbowCloneDirs = new (int, int)[MaxClones];
-    private float[] RainbowCloneHues = new float[MaxClones];
+    private (int dx, int dy)[] RainbowCloneDirections = new (int, int)[MaxClones];
     private int RainbowCloneCount;
 
     private Vector2[] RainbowEyePositions;
-    private Vector2[] RainbowPrevPositions;
-    private (int dx, int dy)[] RainbowEyeDirs;
+    private Vector2[] RainbowPreviousPositions;
+    private (int dx, int dy)[] RainbowEyeDirections;
     private Vector2[] RainbowLogicalPositions;
 
     private bool RainbowMainExitedHouse;
@@ -123,7 +120,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     private (int x, int y)[] RainbowCornerTargets = new (int, int)[1 + MaxClones];
     private float RainbowIdleTime;
 
-    public static Color PersonalityColor(PacmanGhostType Type) => Type switch
+    public static Color PersonalityColor(PacmanGhostType ghostType) => ghostType switch
     {
         PacmanGhostType.Blinky => new Color(255, 0, 20),
         PacmanGhostType.Pinky => new Color(255, 184, 255),
@@ -135,23 +132,23 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         _ => Color.White
     };
 
-    private (int x, int y) RandomScatterCorner() => Rng.Next(4) switch
+    private (int x, int y) RandomScatterCorner() => RandomGenerator.Next(4) switch
     {
-        0 => (Maze.Cols - 3, 0),
+        0 => (Maze.Columns - 3, 0),
         1 => (2, 0),
-        2 => (Maze.Cols - 1, Maze.Rows - 1),
+        2 => (Maze.Columns - 1, Maze.Rows - 1),
         _ => (0, Maze.Rows - 1)
     };
 
-    private (int x, int y) ScatterTarget(PacmanGhostType Type) => Type switch
+    private (int x, int y) ScatterTarget(PacmanGhostType ghostType) => ghostType switch
     {
-        PacmanGhostType.Blinky => (Maze.Cols - 3, 0),
+        PacmanGhostType.Blinky => (Maze.Columns - 3, 0),
         PacmanGhostType.Pinky => (2, 0),
-        PacmanGhostType.Inky => (Maze.Cols - 1, Maze.Rows - 1),
+        PacmanGhostType.Inky => (Maze.Columns - 1, Maze.Rows - 1),
         PacmanGhostType.Clyde => (0, Maze.Rows - 1),
         PacmanGhostType.Dinky => RandomScatterCorner(),
-        PacmanGhostType.Shadow => (Maze.Cols / 2, Maze.Rows / 2),
-        _ => (Maze.Cols / 2, 0)
+        PacmanGhostType.Shadow => (Maze.Columns / 2, Maze.Rows / 2),
+        _ => (Maze.Columns / 2, 0)
     };
 
     Texture2D EyesTexture;
@@ -163,53 +160,56 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         EyesTexture = Renderer.GetTexture("Eyes");
     }
 
-    public void Track(int[] EntityIds, (int x, int y)[] StartCells, GhostEntry[] Entries)
+    public void Track(int[] entityIds, (int x, int y)[] startCells, GhostEntry[] entries)
     {
-        int count = EntityIds.Length;
-        GhostIds = EntityIds;
-        GhostEntries = Entries;
-        GhostCells = new (int, int)[count];
-        GhostTargets = new (int, int)[count];
-        GhostDirs = new (int, int)[count];
-        ChaseTargets = new (int, int)[count];
-        ExitedHouse = new bool[count];
-        Eaten = new bool[count];
-        RespawnTimer = new float[count];
-        Frightened = new bool[count];
-        FrightenedTimers = new float[count];
-        GhostColors = new Color[count];
-        EyePositions = new Vector2[count];
-        PrevPositions = new Vector2[count];
-        Positions = new Vector2[count];
+        int ghostCount = entityIds.Length;
+        GhostIds = entityIds;
+        GhostEntries = entries;
+        GhostCells = new (int, int)[ghostCount];
+        GhostTargets = new (int, int)[ghostCount];
+        GhostDirections = new (int, int)[ghostCount];
+        ChaseTargets = new (int, int)[ghostCount];
 
-        for (int index = 0; index < count; index++)
+        ExitedHouse = new bool[ghostCount];
+        Eaten = new bool[ghostCount];
+        RespawnTimer = new float[ghostCount];
+        Frightened = new bool[ghostCount];
+        FrightenedTimers = new float[ghostCount];
+
+        GhostColors = new Color[ghostCount];
+        EyePositions = new Vector2[ghostCount];
+        PreviousPositions = new Vector2[ghostCount];
+        Positions = new Vector2[ghostCount];
+
+        for (int ghostIndex = 0; ghostIndex < ghostCount; ghostIndex++)
         {
-            GhostCells[index] = StartCells[index];
-            GhostTargets[index] = StartCells[index];
-            GhostDirs[index] = (1, 0);
-            ChaseTargets[index] = PickRandomWalkable();
-            ExitedHouse[index] = false;
-            Eaten[index] = false;
-            RespawnTimer[index] = 0f;
+            GhostCells[ghostIndex] = startCells[ghostIndex];
+            GhostTargets[ghostIndex] = startCells[ghostIndex];
+            GhostDirections[ghostIndex] = (1, 0);
+            ChaseTargets[ghostIndex] = PickRandomWalkable();
+            ExitedHouse[ghostIndex] = false;
+            Eaten[ghostIndex] = false;
+            RespawnTimer[ghostIndex] = 0f;
 
-            GhostColors[index] = PersonalityColor(Entries[index].Type);
-            ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[index]);
-            if (Entries[index].Type == PacmanGhostType.Shadow)
+            GhostColors[ghostIndex] = PersonalityColor(entries[ghostIndex].Type);
+            ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
+
+            if (entries[ghostIndex].Type == PacmanGhostType.Shadow)
             {
-                material.Albedo = GhostColors[index];
+                material.Albedo = GhostColors[ghostIndex];
                 material.Emissive = Color.Black;
             }
             else
             {
                 material.Albedo = Color.Transparent;
-                material.Emissive = GhostColors[index];
+                material.Emissive = GhostColors[ghostIndex];
             }
 
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[index]);
-            var pos = new Vector2(transform.Position.X, transform.Position.Y);
-            EyePositions[index] = pos;
-            PrevPositions[index] = pos;
-            Positions[index] = pos;
+            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+            var position = new Vector2(transform.Position.X, transform.Position.Y);
+            EyePositions[ghostIndex] = position;
+            PreviousPositions[ghostIndex] = position;
+            Positions[ghostIndex] = position;
         }
 
         ElapsedTime = 0f;
@@ -221,56 +221,64 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     public void Clear()
     {
         if (GhostIds == null) return;
-        for (int index = 0; index < GhostIds.Length; index++)
-            Scene.ECS.DestroyEntity(GhostIds[index]);
+
+        for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
+            Scene.ECS.DestroyEntity(GhostIds[ghostIndex]);
+
         GhostIds = null;
     }
 
-    public void SetFrightened(float Duration)
+    public void SetFrightened(float duration)
     {
         if (GhostIds == null) return;
 
-        float timer = Duration + FrightenedExtraDuration;
-        for (int index = 0; index < GhostIds.Length; index++)
-        {
-            if (Eaten[index] || RespawnTimer[index] > 0f || !ExitedHouse[index]) continue;
-            Frightened[index] = true;
-            FrightenedTimers[index] = timer;
+        float timer = duration + FrightenedExtraDuration;
 
-            ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[index]);
+        for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
+        {
+            if (Eaten[ghostIndex] || RespawnTimer[ghostIndex] > 0f || !ExitedHouse[ghostIndex]) continue;
+
+            Frightened[ghostIndex] = true;
+            FrightenedTimers[ghostIndex] = timer;
+
+            ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
             material.Albedo = Color.Transparent;
             material.Emissive = FrightenedColor;
-            ref var circle = ref Scene.ECS.GetComponent<Circle2D>(GhostIds[index]);
+
+            ref var circle = ref Scene.ECS.GetComponent<Circle2D>(GhostIds[ghostIndex]);
             circle.Radius = BodyRadius * FrightenedShrink;
 
-            var (pdx, pdy) = GhostDirs[index];
-            if (pdx == 0 && pdy == 0) continue;
-            var (cx, cy) = GhostCells[index];
-            GhostDirs[index] = (-pdx, -pdy);
-            if (CanGhostMove(index, cx, cy, -pdx, -pdy))
-                GhostTargets[index] = (cx - pdx, cy - pdy);
+            var (previousDirectionX, previousDirectionY) = GhostDirections[ghostIndex];
+            if (previousDirectionX == 0 && previousDirectionY == 0) continue;
+
+            var (cellX, cellY) = GhostCells[ghostIndex];
+            GhostDirections[ghostIndex] = (-previousDirectionX, -previousDirectionY);
+            if (CanGhostMove(ghostIndex, cellX, cellY, -previousDirectionX, -previousDirectionY))
+                GhostTargets[ghostIndex] = (cellX - previousDirectionX, cellY - previousDirectionY);
         }
     }
 
     public override void Update()
     {
-        float dt = (float)GameTime.ElapsedGameTime.TotalSeconds;
-        UpdateRegularGhosts(dt);
-        UpdateRainbowGhost(dt);
+        float deltaTime = (float)GameTime.ElapsedGameTime.TotalSeconds;
+        UpdateRegularGhosts(deltaTime);
+        UpdateRainbowGhost(deltaTime);
     }
 
     public void HideGhostEntities()
     {
         if (GhostIds != null)
         {
-            for (int index = 0; index < GhostIds.Length; index++)
+            for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
             {
-                if (GhostIds[index] == -1 || !Scene.ECS.IsAlive(GhostIds[index])) continue;
-                ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[index]);
+                if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
+
+                ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
                 material.Albedo = Color.Transparent;
                 material.Emissive = Color.Transparent;
             }
         }
+
         if (RainbowInitialized)
         {
             if (Scene.ECS.IsAlive(RainbowMainId))
@@ -279,10 +287,12 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                 material.Albedo = Color.Transparent;
                 material.Emissive = Color.Transparent;
             }
-            for (int index = 0; index < RainbowCloneCount; index++)
+
+            for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
             {
-                if (!Scene.ECS.IsAlive(RainbowCloneIds[index])) continue;
-                ref var material = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[index]);
+                if (!Scene.ECS.IsAlive(RainbowCloneIds[cloneIndex])) continue;
+
+                ref var material = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[cloneIndex]);
                 material.Albedo = Color.Transparent;
                 material.Emissive = Color.Transparent;
             }
@@ -293,38 +303,43 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     {
         if (GhostIds != null)
         {
-            for (int index = 0; index < GhostIds.Length; index++)
+            for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
             {
-                if (GhostIds[index] == -1 || !Scene.ECS.IsAlive(GhostIds[index])) continue;
-                if (Eaten[index]) continue;
-                if (Frightened[index])
+                if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
+                if (Eaten[ghostIndex]) continue;
+
+                if (Frightened[ghostIndex])
                 {
-                    ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[index]);
+                    ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
                     material.Albedo = Color.Transparent;
                     material.Emissive = FrightenedColor;
                     continue;
                 }
-                ref var mat = ref Scene.ECS.GetComponent<Material>(GhostIds[index]);
-                if (GhostEntries[index].Type == PacmanGhostType.Shadow)
+
+                ref var ghostMaterial = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
+
+                if (GhostEntries[ghostIndex].Type == PacmanGhostType.Shadow)
                 {
-                    mat.Albedo = GhostColors[index];
-                    mat.Emissive = Color.Black;
+                    ghostMaterial.Albedo = GhostColors[ghostIndex];
+                    ghostMaterial.Emissive = Color.Black;
                 }
                 else
                 {
-                    mat.Albedo = Color.Transparent;
-                    mat.Emissive = GhostColors[index];
+                    ghostMaterial.Albedo = Color.Transparent;
+                    ghostMaterial.Emissive = GhostColors[ghostIndex];
                 }
             }
         }
+
         if (RainbowInitialized)
         {
             if (Scene.ECS.IsAlive(RainbowMainId) && !RainbowMainEaten)
                 RainbowUpdateMainColor();
-            for (int index = 0; index < RainbowCloneCount; index++)
+
+            for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
             {
-                if (Scene.ECS.IsAlive(RainbowCloneIds[index]))
-                    RainbowUpdateCloneColor(index);
+                if (Scene.ECS.IsAlive(RainbowCloneIds[cloneIndex]))
+                    RainbowUpdateCloneColor(cloneIndex);
             }
         }
     }
@@ -332,120 +347,126 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     public override void Dispose()
     {
         if (!RainbowInitialized) return;
-        for (int index = RainbowCloneCount - 1; index >= 0; index--)
-            RainbowDestroyClone(index);
+
+        for (int cloneIndex = RainbowCloneCount - 1; cloneIndex >= 0; cloneIndex--)
+            RainbowDestroyClone(cloneIndex);
     }
 
-    private void UpdateRegularGhosts(float DeltaTime)
+    private void UpdateRegularGhosts(float deltaTime)
     {
         if (GhostIds == null) return;
 
-        IdleTime += DeltaTime;
+        IdleTime += deltaTime;
 
-        for (int index = 0; index < GhostIds.Length; index++)
+        for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
         {
-            EyePositions[index] = PrevPositions[index];
-            if (GhostIds[index] == -1 || !Scene.ECS.IsAlive(GhostIds[index])) continue;
-            if (Scene.ECS.IsDisabled(GhostIds[index])) continue;
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[index]);
-            PrevPositions[index] = new Vector2(transform.Position.X, transform.Position.Y);
+            EyePositions[ghostIndex] = PreviousPositions[ghostIndex];
+            if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
+            if (Scene.ECS.IsDisabled(GhostIds[ghostIndex])) continue;
+
+            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+            PreviousPositions[ghostIndex] = new Vector2(transform.Position.X, transform.Position.Y);
         }
 
         if (Player == null || !Player.HasMoved)
         {
-            for (int index = 0; index < GhostIds.Length; index++)
+            for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
             {
-                if (GhostIds[index] == -1 || !Scene.ECS.IsAlive(GhostIds[index])) continue;
-                if (Scene.ECS.IsDisabled(GhostIds[index])) continue;
-                ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[index]);
-                float wobble = MathF.Sin(IdleTime * 3f + index * 1.7f) * 3f;
-                var pos = Positions[index];
-                transform.Position = new Vector3(pos.X, pos.Y + wobble, GhostZ);
+                if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
+                if (Scene.ECS.IsDisabled(GhostIds[ghostIndex])) continue;
+
+                ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+                float wobble = MathF.Sin(IdleTime * 3f + ghostIndex * 1.7f) * 3f;
+                var position = Positions[ghostIndex];
+                transform.Position = new Vector3(position.X, position.Y + wobble, GhostDepth);
             }
+
             return;
         }
 
-        ElapsedTime += DeltaTime;
-        UpdateMode(DeltaTime);
+        ElapsedTime += deltaTime;
+        UpdateMode(deltaTime);
 
-        float step = GhostSpeed * DeltaTime;
-        float frightenedStep = step * FrightenedSpeedMultiplier;
+        float moveDistance = GhostSpeed * deltaTime;
+        float frightenedMoveDistance = moveDistance * FrightenedSpeedMultiplier;
 
-        for (int index = 0; index < GhostIds.Length; index++)
+        for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
         {
-            if (GhostIds[index] == -1 || !Scene.ECS.IsAlive(GhostIds[index])) continue;
-            if (Scene.ECS.IsDisabled(GhostIds[index])) continue;
+            if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
+            if (Scene.ECS.IsDisabled(GhostIds[ghostIndex])) continue;
 
-            if (RespawnTimer[index] > 0f)
+            if (RespawnTimer[ghostIndex] > 0f)
             {
-                RespawnTimer[index] -= DeltaTime;
-                if (RespawnTimer[index] <= 0f)
-                    RespawnGhost(index);
+                RespawnTimer[ghostIndex] -= deltaTime;
+                if (RespawnTimer[ghostIndex] <= 0f)
+                    RespawnGhost(ghostIndex);
             }
 
-            float currentStep;
-            if (Eaten[index])
-                currentStep = step * EatenSpeedMultiplier;
-            else if (!ExitedHouse[index] && !IsReleased(index))
-                currentStep = step * 0.5f;
-            else if (Frightened[index])
-                currentStep = frightenedStep;
+            float currentMoveDistance;
+            if (Eaten[ghostIndex])
+                currentMoveDistance = moveDistance * EatenSpeedMultiplier;
+            else if (!ExitedHouse[ghostIndex] && !IsReleased(ghostIndex))
+                currentMoveDistance = moveDistance * 0.5f;
+            else if (Frightened[ghostIndex])
+                currentMoveDistance = frightenedMoveDistance;
             else
-                currentStep = step;
+                currentMoveDistance = moveDistance;
 
-            if (GhostEntries[index].Type == PacmanGhostType.Shadow && ExitedHouse[index]
-                && !Eaten[index] && !Frightened[index])
+            if (GhostEntries[ghostIndex].Type == PacmanGhostType.Shadow && ExitedHouse[ghostIndex]
+                && !Eaten[ghostIndex] && !Frightened[ghostIndex])
             {
-                var (scx, scy) = GhostCells[index];
-                var (stx, sty) = Player != null ? Player.Cell : ChaseTargets[index];
-                float shadowDist = MathF.Sqrt((scx - stx) * (scx - stx) + (scy - sty) * (scy - sty));
-                float mult = shadowDist < 4f ? 1.0f : shadowDist < 12f ? 1.5f : 1.25f;
-                currentStep = step * mult;
+                var (shadowCellX, shadowCellY) = GhostCells[ghostIndex];
+                var (chaseCellX, chaseCellY) = Player != null ? Player.Cell : ChaseTargets[ghostIndex];
+                float shadowDistance = MathF.Sqrt((shadowCellX - chaseCellX) * (shadowCellX - chaseCellX) + (shadowCellY - chaseCellY) * (shadowCellY - chaseCellY));
+                float speedMultiplier = shadowDistance < 4f ? 1.0f : shadowDistance < 12f ? 1.5f : 1.25f;
+                currentMoveDistance = moveDistance * speedMultiplier;
             }
 
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[index]);
-            var pos = Positions[index];
-            var target = Maze.CellCenter(GhostTargets[index].x, GhostTargets[index].y);
+            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+            var position = Positions[ghostIndex];
+            var targetPosition = Maze.CellCenter(GhostTargets[ghostIndex].x, GhostTargets[ghostIndex].y);
 
-            var diff = target - pos;
-            float dist = diff.Length();
+            var targetOffset = targetPosition - position;
+            float distanceToTarget = targetOffset.Length();
 
-            if (dist <= currentStep)
+            if (distanceToTarget <= currentMoveDistance)
             {
-                var raw = GhostTargets[index];
-                GhostCells[index] = (Maze.WrapX(raw.x), raw.y);
-                pos = Maze.CellCenter(GhostCells[index].x, GhostCells[index].y);
-                PickDirection(index);
+                var unwrappedTargetCell = GhostTargets[ghostIndex];
+                GhostCells[ghostIndex] = (Maze.WrapX(unwrappedTargetCell.x), unwrappedTargetCell.y);
+                position = Maze.CellCenter(GhostCells[ghostIndex].x, GhostCells[ghostIndex].y);
+                PickDirection(ghostIndex);
 
-                target = Maze.CellCenter(GhostTargets[index].x, GhostTargets[index].y);
-                diff = target - pos;
-                dist = diff.Length();
+                targetPosition = Maze.CellCenter(GhostTargets[ghostIndex].x, GhostTargets[ghostIndex].y);
+                targetOffset = targetPosition - position;
+                distanceToTarget = targetOffset.Length();
             }
 
-            if (dist > 0.01f)
+            if (distanceToTarget > 0.01f)
             {
-                var move = diff / dist * MathF.Min(currentStep, dist);
-                pos += move;
+                var movementOffset = targetOffset / distanceToTarget * MathF.Min(currentMoveDistance, distanceToTarget);
+                position += movementOffset;
             }
 
-            Positions[index] = pos;
+            Positions[ghostIndex] = position;
 
-            var (dirX, dirY) = GhostDirs[index];
-            float wobble = MathF.Sin(ElapsedTime * 5f + index * 2.5f) * 4f;
+            // Apply visual wobble without changing the maze position.
+            var (directionX, directionY) = GhostDirections[ghostIndex];
+            float wobble = MathF.Sin(ElapsedTime * 5f + ghostIndex * 2.5f) * 4f;
             transform.Position = new Vector3(
-                pos.X + (dirY != 0 ? wobble : 0f),
-                pos.Y + (dirX != 0 ? wobble : 0f), GhostZ);
+                position.X + (directionY != 0 ? wobble : 0f),
+                position.Y + (directionX != 0 ? wobble : 0f), GhostDepth);
 
-            if (ExitedHouse[index] && !Eaten[index] && RespawnTimer[index] <= 0f
+            if (ExitedHouse[ghostIndex] && !Eaten[ghostIndex] && RespawnTimer[ghostIndex] <= 0f
                 && Player != null && !Player.PlayerCaught)
             {
-                float catchDx = pos.X - Player.WorldPosition.X;
-                float catchDy = pos.Y - Player.WorldPosition.Y;
+                float playerOffsetX = position.X - Player.WorldPosition.X;
+                float playerOffsetY = position.Y - Player.WorldPosition.Y;
                 float catchRadius = BodyRadius + Player.HitboxRadius;
-                if (catchDx * catchDx + catchDy * catchDy < catchRadius * catchRadius)
+
+                if (playerOffsetX * playerOffsetX + playerOffsetY * playerOffsetY < catchRadius * catchRadius)
                 {
-                    if (Frightened[index])
-                        EatGhost(index);
+                    if (Frightened[ghostIndex])
+                        EatGhost(ghostIndex);
                     else
                         Player.PlayerCaught = true;
                 }
@@ -453,79 +474,86 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
-    private void EatGhost(int GhostIndex)
+    private void EatGhost(int ghostIndex)
     {
-        Eaten[GhostIndex] = true;
-        Frightened[GhostIndex] = false;
-        FrightenedTimers[GhostIndex] = 0f;
-        ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[GhostIndex]);
+        Eaten[ghostIndex] = true;
+        Frightened[ghostIndex] = false;
+        FrightenedTimers[ghostIndex] = 0f;
+
+        ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
         material.Albedo = Color.Transparent;
         material.Emissive = Color.Transparent;
-        ref var circle = ref Scene.ECS.GetComponent<Circle2D>(GhostIds[GhostIndex]);
+
+        ref var circle = ref Scene.ECS.GetComponent<Circle2D>(GhostIds[ghostIndex]);
         circle.Radius = BodyRadius;
     }
 
-    private void RespawnGhost(int GhostIndex)
+    private void RespawnGhost(int ghostIndex)
     {
-        RespawnTimer[GhostIndex] = 0f;
-        ExitedHouse[GhostIndex] = false;
-        ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[GhostIndex]);
-        if (GhostEntries[GhostIndex].Type == PacmanGhostType.Shadow)
+        RespawnTimer[ghostIndex] = 0f;
+        ExitedHouse[ghostIndex] = false;
+
+        ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
+
+        if (GhostEntries[ghostIndex].Type == PacmanGhostType.Shadow)
         {
-            material.Albedo = GhostColors[GhostIndex];
+            material.Albedo = GhostColors[ghostIndex];
             material.Emissive = Color.Black;
         }
         else
         {
             material.Albedo = Color.Transparent;
-            material.Emissive = GhostColors[GhostIndex];
+            material.Emissive = GhostColors[ghostIndex];
         }
     }
 
-    private void RestoreGhostColor(int GhostIndex)
+    private void RestoreGhostColor(int ghostIndex)
     {
-        if (Eaten[GhostIndex] || RespawnTimer[GhostIndex] > 0f) return;
-        ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[GhostIndex]);
-        if (GhostEntries[GhostIndex].Type == PacmanGhostType.Shadow)
+        if (Eaten[ghostIndex] || RespawnTimer[ghostIndex] > 0f) return;
+
+        ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
+
+        if (GhostEntries[ghostIndex].Type == PacmanGhostType.Shadow)
         {
-            material.Albedo = GhostColors[GhostIndex];
+            material.Albedo = GhostColors[ghostIndex];
             material.Emissive = Color.Black;
         }
         else
         {
             material.Albedo = Color.Transparent;
-            material.Emissive = GhostColors[GhostIndex];
+            material.Emissive = GhostColors[ghostIndex];
         }
     }
 
-    private void UpdateMode(float DeltaTime)
+    private void UpdateMode(float deltaTime)
     {
-        for (int index = 0; index < GhostIds.Length; index++)
+        for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
         {
-            if (!Frightened[index]) continue;
+            if (!Frightened[ghostIndex]) continue;
 
-            FrightenedTimers[index] -= DeltaTime;
-            if (FrightenedTimers[index] <= 0f)
+            FrightenedTimers[ghostIndex] -= deltaTime;
+
+            if (FrightenedTimers[ghostIndex] <= 0f)
             {
-                Frightened[index] = false;
-                FrightenedTimers[index] = 0f;
-                RestoreGhostColor(index);
-                ref var circle = ref Scene.ECS.GetComponent<Circle2D>(GhostIds[index]);
+                Frightened[ghostIndex] = false;
+                FrightenedTimers[ghostIndex] = 0f;
+                RestoreGhostColor(ghostIndex);
+                ref var circle = ref Scene.ECS.GetComponent<Circle2D>(GhostIds[ghostIndex]);
                 circle.Radius = BodyRadius;
             }
-            else if (FrightenedTimers[index] <= FrightenedBlinkThreshold)
+            else if (FrightenedTimers[ghostIndex] <= FrightenedBlinkThreshold)
             {
-                bool blinkOn = MathF.Sin(FrightenedTimers[index] * FrightenedBlinkRate * MathF.PI) > 0f;
-                ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[index]);
+                bool blinkOn = MathF.Sin(FrightenedTimers[ghostIndex] * FrightenedBlinkRate * MathF.PI) > 0f;
+                ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
                 material.Emissive = blinkOn ? FrightenedBlinkColor : FrightenedColor;
             }
             else
             {
-                float hueShift = MathF.Sin(IdleTime * 2.5f + index * 1.3f);
+                float hueShift = MathF.Sin(IdleTime * 2.5f + ghostIndex * 1.3f);
                 byte red = (byte)(30 + 42 * MathF.Max(0, -hueShift));
                 byte green = (byte)(30 + 55 * MathF.Max(0, hueShift));
                 byte blue = (byte)(200 + 42 * MathF.Abs(hueShift));
-                ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[index]);
+                ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
                 material.Emissive = new Color(red, green, blue);
             }
         }
@@ -536,7 +564,8 @@ public class PacmanGhostAI : com.radiant.engine.core.System
             return;
         }
 
-        ModeTimer += DeltaTime;
+        ModeTimer += deltaTime;
+
         if (ModeTimer >= ModeCycle[ModePhase].duration)
         {
             ModeTimer -= ModeCycle[ModePhase].duration;
@@ -548,324 +577,333 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
-    private bool CanGhostMove(int GhostIndex, int CellX, int CellY, int DirX, int DirY)
+    private bool CanGhostMove(int ghostIndex, int cellX, int cellY, int directionX, int directionY)
     {
-        if (!Maze.CanMove(CellX, CellY, DirX, DirY)) return false;
-        if (ExitedHouse[GhostIndex])
+        if (!Maze.CanMove(cellX, cellY, directionX, directionY)) return false;
+
+        if (ExitedHouse[ghostIndex])
         {
-            int nextX = Maze.WrapX(CellX + DirX), nextY = CellY + DirY;
-            if (Maze.IsGhostDoor(nextX, nextY) && !Eaten[GhostIndex]) return false;
-            if (GhostEntries[GhostIndex].Type == PacmanGhostType.Shadow && !Eaten[GhostIndex] && nextX != CellX + DirX) return false;
+            int nextCellX = Maze.WrapX(cellX + directionX), nextCellY = cellY + directionY;
+            if (Maze.IsGhostDoor(nextCellX, nextCellY) && !Eaten[ghostIndex]) return false;
+            if (GhostEntries[ghostIndex].Type == PacmanGhostType.Shadow && !Eaten[ghostIndex] && nextCellX != cellX + directionX) return false;
         }
+
         return true;
     }
 
-    private (int x, int y) GetTargetTile(int GhostIndex)
+    private (int x, int y) GetTargetTile(int ghostIndex)
     {
         if (CurrentMode == PacmanGhostMode.Scatter)
-            return ScatterTarget(GhostEntries[GhostIndex].Type);
+            return ScatterTarget(GhostEntries[ghostIndex].Type);
 
-        var (cx, cy) = GhostCells[GhostIndex];
+        var (cellX, cellY) = GhostCells[ghostIndex];
 
         if (Player != null)
         {
-            var (px, py) = Player.Cell;
+            var (playerCellX, playerCellY) = Player.Cell;
 
-            if (GhostEntries[GhostIndex].Type == PacmanGhostType.Clyde)
+            if (GhostEntries[ghostIndex].Type == PacmanGhostType.Clyde)
             {
-                float dist = MathF.Sqrt((cx - px) * (cx - px) + (cy - py) * (cy - py));
-                if (dist < 8f)
+                float distanceToTarget = MathF.Sqrt((cellX - playerCellX) * (cellX - playerCellX) + (cellY - playerCellY) * (cellY - playerCellY));
+                if (distanceToTarget < 8f)
                     return ScatterTarget(PacmanGhostType.Clyde);
             }
 
-            if (GhostEntries[GhostIndex].Type == PacmanGhostType.Dinky)
+            if (GhostEntries[ghostIndex].Type == PacmanGhostType.Dinky)
             {
-                float dist = MathF.Sqrt((cx - px) * (cx - px) + (cy - py) * (cy - py));
-                if (dist < 10f)
+                float distanceToTarget = MathF.Sqrt((cellX - playerCellX) * (cellX - playerCellX) + (cellY - playerCellY) * (cellY - playerCellY));
+                if (distanceToTarget < 10f)
                     return RandomScatterCorner();
             }
 
-            return (px, py);
+            return (playerCellX, playerCellY);
         }
 
-        var (tx, ty) = ChaseTargets[GhostIndex];
+        var (targetCellX, targetCellY) = ChaseTargets[ghostIndex];
 
-        if (GhostEntries[GhostIndex].Type == PacmanGhostType.Clyde)
+        if (GhostEntries[ghostIndex].Type == PacmanGhostType.Clyde)
         {
-            float dist = MathF.Sqrt((cx - tx) * (cx - tx) + (cy - ty) * (cy - ty));
-            if (dist < 8f)
+            float distanceToTarget = MathF.Sqrt((cellX - targetCellX) * (cellX - targetCellX) + (cellY - targetCellY) * (cellY - targetCellY));
+            if (distanceToTarget < 8f)
                 return ScatterTarget(PacmanGhostType.Clyde);
         }
 
-        if (GhostEntries[GhostIndex].Type == PacmanGhostType.Dinky)
+        if (GhostEntries[ghostIndex].Type == PacmanGhostType.Dinky)
         {
-            float dist = MathF.Sqrt((cx - tx) * (cx - tx) + (cy - ty) * (cy - ty));
-            if (dist < 10f)
+            float distanceToTarget = MathF.Sqrt((cellX - targetCellX) * (cellX - targetCellX) + (cellY - targetCellY) * (cellY - targetCellY));
+            if (distanceToTarget < 10f)
                 return RandomScatterCorner();
         }
 
-        if (GhostEntries[GhostIndex].Type == PacmanGhostType.Shadow)
+        if (GhostEntries[ghostIndex].Type == PacmanGhostType.Shadow)
         {
-            float manhattan = MathF.Abs(cx - tx) + MathF.Abs(cy - ty);
-            if (manhattan <= 1 || Maze.IsWall(tx, ty))
-                ChaseTargets[GhostIndex] = PickRandomWalkable();
-            return ChaseTargets[GhostIndex];
+            float manhattanDistance = MathF.Abs(cellX - targetCellX) + MathF.Abs(cellY - targetCellY);
+            if (manhattanDistance <= 1 || Maze.IsWall(targetCellX, targetCellY))
+                ChaseTargets[ghostIndex] = PickRandomWalkable();
+            return ChaseTargets[ghostIndex];
         }
 
-        float manhattan2 = MathF.Abs(cx - tx) + MathF.Abs(cy - ty);
-        if (manhattan2 <= 2 || Maze.IsWall(tx, ty))
-            ChaseTargets[GhostIndex] = PickRandomWalkable();
+        float targetManhattanDistance = MathF.Abs(cellX - targetCellX) + MathF.Abs(cellY - targetCellY);
+        if (targetManhattanDistance <= 2 || Maze.IsWall(targetCellX, targetCellY))
+            ChaseTargets[ghostIndex] = PickRandomWalkable();
 
-        return ChaseTargets[GhostIndex];
+        return ChaseTargets[ghostIndex];
     }
 
-    private void PickDirection(int GhostIndex)
+    private void PickDirection(int ghostIndex)
     {
-        var (cx, cy) = GhostCells[GhostIndex];
-        var (pdx, pdy) = GhostDirs[GhostIndex];
+        var (cellX, cellY) = GhostCells[ghostIndex];
+        var (previousDirectionX, previousDirectionY) = GhostDirections[ghostIndex];
 
-        if (!ExitedHouse[GhostIndex])
+        if (!ExitedHouse[ghostIndex])
         {
-            if (!Maze.InGhostHouse(cx, cy) && !Maze.IsGhostDoor(cx, cy))
+            if (!Maze.InGhostHouse(cellX, cellY) && !Maze.IsGhostDoor(cellX, cellY))
             {
-                ExitedHouse[GhostIndex] = true;
+                ExitedHouse[ghostIndex] = true;
             }
             else
             {
-                if (IsReleased(GhostIndex))
-                    PickHouseExit(GhostIndex);
+                if (IsReleased(ghostIndex))
+                    PickHouseExit(ghostIndex);
                 else
-                    PickHouseWander(GhostIndex);
+                    PickHouseWander(ghostIndex);
                 return;
             }
         }
 
-        if (Eaten[GhostIndex])
+        if (Eaten[ghostIndex])
         {
-            PickEatenPath(GhostIndex);
+            PickEatenPath(ghostIndex);
             return;
         }
 
-        if (Frightened[GhostIndex])
+        if (Frightened[ghostIndex])
         {
-            PickRandom(GhostIndex);
+            PickRandom(ghostIndex);
             return;
         }
 
-        var targetTile = GetTargetTile(GhostIndex);
+        var targetTile = GetTargetTile(ghostIndex);
 
-        Span<(int dx, int dy)> options = stackalloc (int, int)[4];
-        int count = 0;
+        Span<(int dx, int dy)> availableDirections = stackalloc (int, int)[4];
+        int directionCount = 0;
 
-        for (int dir = 0; dir < 4; dir++)
+        for (int directionIndex = 0; directionIndex < 4; directionIndex++)
         {
-            if (!CanGhostMove(GhostIndex, cx, cy, DXs[dir], DYs[dir])) continue;
-            if (DXs[dir] == -pdx && DYs[dir] == -pdy) continue;
-            if (DYs[dir] == -1 && Maze.IsNoUpTile(cx, cy)) continue;
-            options[count++] = (DXs[dir], DYs[dir]);
+            if (!CanGhostMove(ghostIndex, cellX, cellY, HorizontalDirections[directionIndex], VerticalDirections[directionIndex])) continue;
+            if (HorizontalDirections[directionIndex] == -previousDirectionX && VerticalDirections[directionIndex] == -previousDirectionY) continue;
+            if (VerticalDirections[directionIndex] == -1 && Maze.IsNoUpTile(cellX, cellY)) continue;
+
+            availableDirections[directionCount++] = (HorizontalDirections[directionIndex], VerticalDirections[directionIndex]);
         }
 
-        if (count == 0)
+        if (directionCount == 0)
         {
-            GhostDirs[GhostIndex] = (-pdx, -pdy);
-            GhostTargets[GhostIndex] = (cx - pdx, cy - pdy);
+            GhostDirections[ghostIndex] = (-previousDirectionX, -previousDirectionY);
+            GhostTargets[ghostIndex] = (cellX - previousDirectionX, cellY - previousDirectionY);
             return;
         }
 
-        if (count == 1)
+        if (directionCount == 1)
         {
-            var only = options[0];
-            GhostDirs[GhostIndex] = only;
-            GhostTargets[GhostIndex] = (cx + only.dx, cy + only.dy);
+            var onlyDirection = availableDirections[0];
+            GhostDirections[ghostIndex] = onlyDirection;
+            GhostTargets[ghostIndex] = (cellX + onlyDirection.dx, cellY + onlyDirection.dy);
             return;
         }
 
-        float bestDist = float.MaxValue;
-        (int dx, int dy) bestDir = options[0];
+        float bestDistanceSquared = float.MaxValue;
+        (int dx, int dy) bestDirection = availableDirections[0];
 
-        for (int optIndex = 0; optIndex < count; optIndex++)
+        for (int optionIndex = 0; optionIndex < directionCount; optionIndex++)
         {
-            float distX = cx + options[optIndex].dx - targetTile.x;
-            float distY = cy + options[optIndex].dy - targetTile.y;
-            float dist = distX * distX + distY * distY;
+            float targetOffsetX = cellX + availableDirections[optionIndex].dx - targetTile.x;
+            float targetOffsetY = cellY + availableDirections[optionIndex].dy - targetTile.y;
+            float distanceSquared = targetOffsetX * targetOffsetX + targetOffsetY * targetOffsetY;
 
-            if (dist < bestDist)
+            if (distanceSquared < bestDistanceSquared)
             {
-                bestDist = dist;
-                bestDir = options[optIndex];
+                bestDistanceSquared = distanceSquared;
+                bestDirection = availableDirections[optionIndex];
             }
         }
 
-        GhostDirs[GhostIndex] = bestDir;
-        GhostTargets[GhostIndex] = (cx + bestDir.dx, cy + bestDir.dy);
+        GhostDirections[ghostIndex] = bestDirection;
+        GhostTargets[ghostIndex] = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
-    private void PickEatenPath(int GhostIndex)
+    private void PickEatenPath(int ghostIndex)
     {
-        var (cx, cy) = GhostCells[GhostIndex];
-        var (pdx, pdy) = GhostDirs[GhostIndex];
+        var (cellX, cellY) = GhostCells[ghostIndex];
+        var (previousDirectionX, previousDirectionY) = GhostDirections[ghostIndex];
 
-        if (Maze.InGhostHouse(cx, cy))
+        if (Maze.InGhostHouse(cellX, cellY))
         {
-            Eaten[GhostIndex] = false;
-            RespawnTimer[GhostIndex] = RespawnDelay;
-            ExitedHouse[GhostIndex] = false;
+            Eaten[ghostIndex] = false;
+            RespawnTimer[ghostIndex] = RespawnDelay;
+            ExitedHouse[ghostIndex] = false;
 
-            ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[GhostIndex]);
+            ref var material = ref Scene.ECS.GetComponent<Material>(GhostIds[ghostIndex]);
             material.Albedo = Color.Transparent;
-            material.Emissive = GhostColors[GhostIndex];
+            material.Emissive = GhostColors[ghostIndex];
 
-            PickHouseWander(GhostIndex);
+            PickHouseWander(ghostIndex);
             return;
         }
 
-        if (Maze.IsGhostDoor(cx, cy))
+        if (Maze.IsGhostDoor(cellX, cellY))
         {
-            GhostDirs[GhostIndex] = (0, 1);
-            GhostTargets[GhostIndex] = (cx, cy + 1);
+            GhostDirections[ghostIndex] = (0, 1);
+            GhostTargets[ghostIndex] = (cellX, cellY + 1);
             return;
         }
 
         int targetX = Maze.HouseDoorLeft;
         int targetY = Maze.HouseDoorY;
 
-        Span<(int dx, int dy)> options = stackalloc (int, int)[4];
-        int count = 0;
+        Span<(int dx, int dy)> availableDirections = stackalloc (int, int)[4];
+        int directionCount = 0;
 
-        for (int dir = 0; dir < 4; dir++)
+        for (int directionIndex = 0; directionIndex < 4; directionIndex++)
         {
-            if (!CanGhostMove(GhostIndex, cx, cy, DXs[dir], DYs[dir])) continue;
-            if (DXs[dir] == -pdx && DYs[dir] == -pdy) continue;
-            options[count++] = (DXs[dir], DYs[dir]);
+            if (!CanGhostMove(ghostIndex, cellX, cellY, HorizontalDirections[directionIndex], VerticalDirections[directionIndex])) continue;
+            if (HorizontalDirections[directionIndex] == -previousDirectionX && VerticalDirections[directionIndex] == -previousDirectionY) continue;
+
+            availableDirections[directionCount++] = (HorizontalDirections[directionIndex], VerticalDirections[directionIndex]);
         }
 
-        if (count == 0)
+        if (directionCount == 0)
         {
-            GhostDirs[GhostIndex] = (-pdx, -pdy);
-            GhostTargets[GhostIndex] = (cx - pdx, cy - pdy);
+            GhostDirections[ghostIndex] = (-previousDirectionX, -previousDirectionY);
+            GhostTargets[ghostIndex] = (cellX - previousDirectionX, cellY - previousDirectionY);
             return;
         }
 
-        if (count == 1)
+        if (directionCount == 1)
         {
-            var only = options[0];
-            GhostDirs[GhostIndex] = only;
-            GhostTargets[GhostIndex] = (cx + only.dx, cy + only.dy);
+            var onlyDirection = availableDirections[0];
+            GhostDirections[ghostIndex] = onlyDirection;
+            GhostTargets[ghostIndex] = (cellX + onlyDirection.dx, cellY + onlyDirection.dy);
             return;
         }
 
-        float bestDist = float.MaxValue;
-        (int dx, int dy) bestDir = options[0];
+        float bestDistanceSquared = float.MaxValue;
+        (int dx, int dy) bestDirection = availableDirections[0];
 
-        for (int optIndex = 0; optIndex < count; optIndex++)
+        for (int optionIndex = 0; optionIndex < directionCount; optionIndex++)
         {
-            float distX = cx + options[optIndex].dx - targetX;
-            float distY = cy + options[optIndex].dy - targetY;
-            float dist = distX * distX + distY * distY;
-            if (dist < bestDist)
+            float targetOffsetX = cellX + availableDirections[optionIndex].dx - targetX;
+            float targetOffsetY = cellY + availableDirections[optionIndex].dy - targetY;
+            float distanceSquared = targetOffsetX * targetOffsetX + targetOffsetY * targetOffsetY;
+
+            if (distanceSquared < bestDistanceSquared)
             {
-                bestDist = dist;
-                bestDir = options[optIndex];
+                bestDistanceSquared = distanceSquared;
+                bestDirection = availableDirections[optionIndex];
             }
         }
 
-        GhostDirs[GhostIndex] = bestDir;
-        GhostTargets[GhostIndex] = (cx + bestDir.dx, cy + bestDir.dy);
+        GhostDirections[ghostIndex] = bestDirection;
+        GhostTargets[ghostIndex] = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
-    private void PickHouseExit(int GhostIndex)
+    private void PickHouseExit(int ghostIndex)
     {
-        var (cx, cy) = GhostCells[GhostIndex];
-        int doorL = Maze.HouseDoorLeft;
-        int doorR = Maze.HouseDoorRight;
+        var (cellX, cellY) = GhostCells[ghostIndex];
+        int doorLeft = Maze.HouseDoorLeft;
+        int doorRight = Maze.HouseDoorRight;
 
-        if (cx < doorL && Maze.CanMove(cx, cy, 1, 0))
+        if (cellX < doorLeft && Maze.CanMove(cellX, cellY, 1, 0))
         {
-            GhostDirs[GhostIndex] = (1, 0);
-            GhostTargets[GhostIndex] = (cx + 1, cy);
+            GhostDirections[ghostIndex] = (1, 0);
+            GhostTargets[ghostIndex] = (cellX + 1, cellY);
         }
-        else if (cx > doorR && Maze.CanMove(cx, cy, -1, 0))
+        else if (cellX > doorRight && Maze.CanMove(cellX, cellY, -1, 0))
         {
-            GhostDirs[GhostIndex] = (-1, 0);
-            GhostTargets[GhostIndex] = (cx - 1, cy);
+            GhostDirections[ghostIndex] = (-1, 0);
+            GhostTargets[ghostIndex] = (cellX - 1, cellY);
         }
-        else if (Maze.CanMove(cx, cy, 0, -1))
+        else if (Maze.CanMove(cellX, cellY, 0, -1))
         {
-            GhostDirs[GhostIndex] = (0, -1);
-            GhostTargets[GhostIndex] = (cx, cy - 1);
+            GhostDirections[ghostIndex] = (0, -1);
+            GhostTargets[ghostIndex] = (cellX, cellY - 1);
         }
         else
         {
-            for (int dir = 0; dir < 4; dir++)
-                if (Maze.CanMove(cx, cy, DXs[dir], DYs[dir]))
+            for (int directionIndex = 0; directionIndex < 4; directionIndex++)
+                if (Maze.CanMove(cellX, cellY, HorizontalDirections[directionIndex], VerticalDirections[directionIndex]))
                 {
-                    GhostDirs[GhostIndex] = (DXs[dir], DYs[dir]);
-                    GhostTargets[GhostIndex] = (cx + DXs[dir], cy + DYs[dir]);
+                    GhostDirections[ghostIndex] = (HorizontalDirections[directionIndex], VerticalDirections[directionIndex]);
+                    GhostTargets[ghostIndex] = (cellX + HorizontalDirections[directionIndex], cellY + VerticalDirections[directionIndex]);
                     return;
                 }
         }
     }
 
-    private void PickHouseWander(int GhostIndex)
+    private void PickHouseWander(int ghostIndex)
     {
-        var (cx, cy) = GhostCells[GhostIndex];
-        var (pdx, _) = GhostDirs[GhostIndex];
+        var (cellX, cellY) = GhostCells[ghostIndex];
+        var (previousDirectionX, _) = GhostDirections[ghostIndex];
 
-        if (pdx == 0)
-            pdx = Rng.Next(2) == 0 ? -1 : 1;
+        if (previousDirectionX == 0)
+            previousDirectionX = RandomGenerator.Next(2) == 0 ? -1 : 1;
 
-        if (Maze.CanMove(cx, cy, pdx, 0) && Maze.InGhostHouse(cx + pdx, cy))
+        if (Maze.CanMove(cellX, cellY, previousDirectionX, 0) && Maze.InGhostHouse(cellX + previousDirectionX, cellY))
         {
-            GhostDirs[GhostIndex] = (pdx, 0);
-            GhostTargets[GhostIndex] = (cx + pdx, cy);
+            GhostDirections[ghostIndex] = (previousDirectionX, 0);
+            GhostTargets[ghostIndex] = (cellX + previousDirectionX, cellY);
         }
-        else if (Maze.CanMove(cx, cy, -pdx, 0) && Maze.InGhostHouse(cx - pdx, cy))
+        else if (Maze.CanMove(cellX, cellY, -previousDirectionX, 0) && Maze.InGhostHouse(cellX - previousDirectionX, cellY))
         {
-            GhostDirs[GhostIndex] = (-pdx, 0);
-            GhostTargets[GhostIndex] = (cx - pdx, cy);
+            GhostDirections[ghostIndex] = (-previousDirectionX, 0);
+            GhostTargets[ghostIndex] = (cellX - previousDirectionX, cellY);
         }
         else
         {
-            GhostDirs[GhostIndex] = (0, 0);
-            GhostTargets[GhostIndex] = (cx, cy);
+            GhostDirections[ghostIndex] = (0, 0);
+            GhostTargets[ghostIndex] = (cellX, cellY);
         }
     }
 
-    private void PickRandom(int GhostIndex)
+    private void PickRandom(int ghostIndex)
     {
-        var (cx, cy) = GhostCells[GhostIndex];
-        var (pdx, pdy) = GhostDirs[GhostIndex];
+        var (cellX, cellY) = GhostCells[ghostIndex];
+        var (previousDirectionX, previousDirectionY) = GhostDirections[ghostIndex];
 
-        Span<(int dx, int dy)> options = stackalloc (int, int)[4];
-        int count = 0;
+        Span<(int dx, int dy)> availableDirections = stackalloc (int, int)[4];
+        int directionCount = 0;
 
-        for (int dir = 0; dir < 4; dir++)
-            if (CanGhostMove(GhostIndex, cx, cy, DXs[dir], DYs[dir]) && !(DXs[dir] == -pdx && DYs[dir] == -pdy))
-                options[count++] = (DXs[dir], DYs[dir]);
+        for (int directionIndex = 0; directionIndex < 4; directionIndex++)
+            if (CanGhostMove(ghostIndex, cellX, cellY, HorizontalDirections[directionIndex], VerticalDirections[directionIndex]) && !(HorizontalDirections[directionIndex] == -previousDirectionX && VerticalDirections[directionIndex] == -previousDirectionY))
+                availableDirections[directionCount++] = (HorizontalDirections[directionIndex], VerticalDirections[directionIndex]);
 
-        if (count == 0)
+        if (directionCount == 0)
         {
-            GhostDirs[GhostIndex] = (-pdx, -pdy);
-            GhostTargets[GhostIndex] = (cx - pdx, cy - pdy);
+            GhostDirections[ghostIndex] = (-previousDirectionX, -previousDirectionY);
+            GhostTargets[ghostIndex] = (cellX - previousDirectionX, cellY - previousDirectionY);
             return;
         }
 
-        var pick = options[Rng.Next(count)];
-        GhostDirs[GhostIndex] = pick;
-        GhostTargets[GhostIndex] = (cx + pick.dx, cy + pick.dy);
+        var chosenDirection = availableDirections[RandomGenerator.Next(directionCount)];
+        GhostDirections[ghostIndex] = chosenDirection;
+        GhostTargets[ghostIndex] = (cellX + chosenDirection.dx, cellY + chosenDirection.dy);
     }
 
-    private bool IsReleased(int GhostIndex)
+    private bool IsReleased(int ghostIndex)
     {
-        if (RespawnTimer[GhostIndex] > 0f) return false;
-        ref var entry = ref GhostEntries[GhostIndex];
+        if (RespawnTimer[ghostIndex] > 0f) return false;
+
+        ref var entry = ref GhostEntries[ghostIndex];
         if (entry.ReleaseAfter > 0 && ElapsedTime >= entry.ReleaseAfter) return true;
+
         if (entry.ReleaseAtCoinPercent > 0 && Player != null && Player.CoinsTotal > 0)
         {
             float coinPercent = (float)Player.CoinsCollected / Player.CoinsTotal;
             if (coinPercent >= entry.ReleaseAtCoinPercent) return true;
         }
+
         if (entry.ReleaseAfter <= 0 && entry.ReleaseAtCoinPercent <= 0) return true;
+
         return false;
     }
 
@@ -873,45 +911,49 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     {
         for (int attempt = 0; attempt < 100; attempt++)
         {
-            int cellX = Rng.Next(Maze.Cols);
-            int cellY = Rng.Next(Maze.Rows);
+            int cellX = RandomGenerator.Next(Maze.Columns);
+            int cellY = RandomGenerator.Next(Maze.Rows);
             if (!Maze.IsWall(cellX, cellY) && !Maze.InGhostHouse(cellX, cellY) && !Maze.IsGhostDoor(cellX, cellY))
                 return (cellX, cellY);
         }
-        return (Maze.Cols / 2, 0);
+
+        return (Maze.Columns / 2, 0);
     }
 
-    public void TrackRainbow(int EntityId, (int x, int y) StartCell, float ReleaseTime = 0f, float ReleaseAtCoinPercent = 0f)
+    public void TrackRainbow(int entityId, (int x, int y) startCell, float releaseTime = 0f, float releaseAtCoinPercent = 0f)
     {
-        RainbowMainId = EntityId;
-        RainbowMainCell = StartCell;
-        RainbowMainTarget = StartCell;
-        RainbowMainDir = (1, 0);
+        RainbowMainId = entityId;
+        RainbowMainCell = startCell;
+        RainbowMainTarget = startCell;
+        RainbowMainDirection = (1, 0);
         RainbowMainHue = 0f;
+
         RainbowMainExitedHouse = false;
         RainbowMainEaten = false;
         RainbowMainRespawnTimer = 0f;
         RainbowFrightenedTimer = 0f;
+
         RainbowCloneCount = 0;
         RainbowPhaseState = RainbowPhase.Solo;
         RainbowPhaseTimer = 0f;
-        RainbowReleaseTime = ReleaseTime;
-        RainbowReleaseAtCoinPercent = ReleaseAtCoinPercent;
+
+        RainbowReleaseTime = releaseTime;
+        RainbowReleaseAtCoinPercent = releaseAtCoinPercent;
         RainbowElapsedTime = 0f;
         RainbowInitialized = true;
 
-        int total = 1 + MaxClones;
-        RainbowEyePositions = new Vector2[total];
-        RainbowPrevPositions = new Vector2[total];
-        RainbowEyeDirs = new (int, int)[total];
-        RainbowLogicalPositions = new Vector2[total];
+        int rainbowCapacity = 1 + MaxClones;
+        RainbowEyePositions = new Vector2[rainbowCapacity];
+        RainbowPreviousPositions = new Vector2[rainbowCapacity];
+        RainbowEyeDirections = new (int, int)[rainbowCapacity];
+        RainbowLogicalPositions = new Vector2[rainbowCapacity];
 
         ref var transform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
-        var pos = new Vector2(transform.Position.X, transform.Position.Y);
-        RainbowEyePositions[0] = pos;
-        RainbowPrevPositions[0] = pos;
-        RainbowEyeDirs[0] = (1, 0);
-        RainbowLogicalPositions[0] = pos;
+        var position = new Vector2(transform.Position.X, transform.Position.Y);
+        RainbowEyePositions[0] = position;
+        RainbowPreviousPositions[0] = position;
+        RainbowEyeDirections[0] = (1, 0);
+        RainbowLogicalPositions[0] = position;
 
         RainbowWanderTargetTiles[0] = RainbowPickRandomWalkable();
 
@@ -921,74 +963,84 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     public void ClearRainbow()
     {
         if (!RainbowInitialized) return;
-        for (int index = RainbowCloneCount - 1; index >= 0; index--)
-            RainbowDestroyClone(index);
+
+        for (int cloneIndex = RainbowCloneCount - 1; cloneIndex >= 0; cloneIndex--)
+            RainbowDestroyClone(cloneIndex);
+
         Scene.ECS.DestroyEntity(RainbowMainId);
         RainbowInitialized = false;
     }
 
-    public void SetRainbowFrightened(float Duration)
+    public void SetRainbowFrightened(float duration)
     {
         if (!RainbowInitialized) return;
-        RainbowFrightenedTimer = Duration + FrightenedExtraDuration;
+
+        RainbowFrightenedTimer = duration + FrightenedExtraDuration;
 
         if (!RainbowMainEaten && RainbowMainExitedHouse)
         {
             ref var mainMaterial = ref Scene.ECS.GetComponent<Material>(RainbowMainId);
             mainMaterial.Albedo = Color.Transparent;
             mainMaterial.Emissive = FrightenedColor;
+
             ref var mainCircle = ref Scene.ECS.GetComponent<Circle2D>(RainbowMainId);
             mainCircle.Radius = BodyRadius * FrightenedShrink;
 
-            var (pdx, pdy) = RainbowMainDir;
-            if (pdx != 0 || pdy != 0)
+            var (previousDirectionX, previousDirectionY) = RainbowMainDirection;
+
+            if (previousDirectionX != 0 || previousDirectionY != 0)
             {
-                RainbowMainDir = (-pdx, -pdy);
-                var (cx, cy) = RainbowMainCell;
-                if (RainbowCanMove(cx, cy, -pdx, -pdy))
-                    RainbowMainTarget = (cx - pdx, cy - pdy);
+                RainbowMainDirection = (-previousDirectionX, -previousDirectionY);
+                var (cellX, cellY) = RainbowMainCell;
+                if (RainbowCanMove(cellX, cellY, -previousDirectionX, -previousDirectionY))
+                    RainbowMainTarget = (cellX - previousDirectionX, cellY - previousDirectionY);
             }
         }
-        for (int index = 0; index < RainbowCloneCount; index++)
+
+        for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
         {
-            ref var cloneMaterial = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[index]);
+            ref var cloneMaterial = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[cloneIndex]);
             cloneMaterial.Albedo = Color.Transparent;
             cloneMaterial.Emissive = FrightenedColor;
-            ref var cloneCircle = ref Scene.ECS.GetComponent<Circle2D>(RainbowCloneIds[index]);
+
+            ref var cloneCircle = ref Scene.ECS.GetComponent<Circle2D>(RainbowCloneIds[cloneIndex]);
             cloneCircle.Radius = BodyRadius * FrightenedShrink;
 
-            var (cdx, cdy) = RainbowCloneDirs[index];
-            if (cdx != 0 || cdy != 0)
+            var (cloneDirectionX, cloneDirectionY) = RainbowCloneDirections[cloneIndex];
+
+            if (cloneDirectionX != 0 || cloneDirectionY != 0)
             {
-                RainbowCloneDirs[index] = (-cdx, -cdy);
-                var (ccx, ccy) = RainbowCloneCells[index];
-                if (RainbowCanMove(ccx, ccy, -cdx, -cdy))
-                    RainbowCloneTargets[index] = (ccx - cdx, ccy - cdy);
+                RainbowCloneDirections[cloneIndex] = (-cloneDirectionX, -cloneDirectionY);
+                var (cloneCellX, cloneCellY) = RainbowCloneCells[cloneIndex];
+                if (RainbowCanMove(cloneCellX, cloneCellY, -cloneDirectionX, -cloneDirectionY))
+                    RainbowCloneTargets[cloneIndex] = (cloneCellX - cloneDirectionX, cloneCellY - cloneDirectionY);
             }
         }
     }
 
-    private void UpdateRainbowGhost(float DeltaTime)
+    private void UpdateRainbowGhost(float deltaTime)
     {
         if (!RainbowInitialized) return;
 
-        RainbowIdleTime += DeltaTime;
+        RainbowIdleTime += deltaTime;
 
         if (!RainbowMainEaten && RainbowMainRespawnTimer <= 0f)
-            RainbowMainHue = (RainbowMainHue + HueCycleSpeed * DeltaTime) % 1f;
+            RainbowMainHue = (RainbowMainHue + HueCycleSpeed * deltaTime) % 1f;
 
         RainbowShiftEyeHistory();
 
         if (RainbowFrightenedTimer <= 0f && !RainbowMainEaten && RainbowMainRespawnTimer <= 0f)
         {
             RainbowUpdateMainColor();
-            for (int index = 0; index < RainbowCloneCount; index++)
-                RainbowUpdateCloneColor(index);
+
+            for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
+                RainbowUpdateCloneColor(cloneIndex);
         }
 
         if (RainbowFrightenedTimer > 0f)
         {
-            RainbowFrightenedTimer -= DeltaTime;
+            RainbowFrightenedTimer -= deltaTime;
+
             if (RainbowFrightenedTimer <= 0f)
             {
                 if (!RainbowMainEaten && RainbowMainRespawnTimer <= 0f)
@@ -997,10 +1049,11 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                     ref var mainCircle = ref Scene.ECS.GetComponent<Circle2D>(RainbowMainId);
                     mainCircle.Radius = BodyRadius;
                 }
-                for (int index = 0; index < RainbowCloneCount; index++)
+
+                for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
                 {
-                    RainbowUpdateCloneColor(index);
-                    ref var cloneCircle = ref Scene.ECS.GetComponent<Circle2D>(RainbowCloneIds[index]);
+                    RainbowUpdateCloneColor(cloneIndex);
+                    ref var cloneCircle = ref Scene.ECS.GetComponent<Circle2D>(RainbowCloneIds[cloneIndex]);
                     cloneCircle.Radius = BodyRadius;
                 }
             }
@@ -1008,14 +1061,16 @@ public class PacmanGhostAI : com.radiant.engine.core.System
             {
                 bool blinkOn = MathF.Sin(RainbowFrightenedTimer * FrightenedBlinkRate * MathF.PI) > 0f;
                 var blinkColor = blinkOn ? FrightenedBlinkColor : FrightenedColor;
+
                 if (!RainbowMainEaten && RainbowMainRespawnTimer <= 0f && RainbowMainExitedHouse)
                 {
                     ref var mainMaterial = ref Scene.ECS.GetComponent<Material>(RainbowMainId);
                     mainMaterial.Emissive = blinkColor;
                 }
-                for (int index = 0; index < RainbowCloneCount; index++)
+
+                for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
                 {
-                    ref var cloneMaterial = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[index]);
+                    ref var cloneMaterial = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[cloneIndex]);
                     cloneMaterial.Emissive = blinkColor;
                 }
             }
@@ -1026,14 +1081,16 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                 byte green = (byte)(30 + 55 * MathF.Max(0, hueShift));
                 byte blue = (byte)(200 + 42 * MathF.Abs(hueShift));
                 var cycledColor = new Color(red, green, blue);
+
                 if (!RainbowMainEaten && RainbowMainRespawnTimer <= 0f && RainbowMainExitedHouse)
                 {
                     ref var mainMaterial = ref Scene.ECS.GetComponent<Material>(RainbowMainId);
                     mainMaterial.Emissive = cycledColor;
                 }
-                for (int index = 0; index < RainbowCloneCount; index++)
+
+                for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
                 {
-                    ref var cloneMaterial = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[index]);
+                    ref var cloneMaterial = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[cloneIndex]);
                     cloneMaterial.Emissive = cycledColor;
                 }
             }
@@ -1041,7 +1098,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
         if (RainbowMainRespawnTimer > 0f)
         {
-            RainbowMainRespawnTimer -= DeltaTime;
+            RainbowMainRespawnTimer -= deltaTime;
             if (RainbowMainRespawnTimer <= 0f)
                 RainbowRespawnMain();
         }
@@ -1049,37 +1106,39 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         if (Player == null || !Player.HasMoved)
         {
             ref var transform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
-            var pos = RainbowLogicalPositions[0];
+            var position = RainbowLogicalPositions[0];
             float wobble = MathF.Sin(RainbowIdleTime * 3f) * 3f;
-            transform.Position = new Vector3(pos.X, pos.Y + wobble, GhostZ);
+            transform.Position = new Vector3(position.X, position.Y + wobble, GhostDepth);
             return;
         }
 
-        RainbowElapsedTime += DeltaTime;
+        RainbowElapsedTime += deltaTime;
 
         if (!RainbowIsReleased())
         {
-            RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDir, RainbowMainId, DeltaTime, 0);
+            RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDirection, RainbowMainId, deltaTime, 0);
             return;
         }
 
         if (RainbowMainEaten)
         {
-            RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDir, RainbowMainId, DeltaTime, 0);
+            RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDirection, RainbowMainId, deltaTime, 0);
             return;
         }
 
         if (RainbowMainRespawnTimer > 0f)
         {
-            RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDir, RainbowMainId, DeltaTime, 0);
+            RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDirection, RainbowMainId, deltaTime, 0);
             return;
         }
 
-        RainbowPhaseTimer += DeltaTime;
+        RainbowPhaseTimer += deltaTime;
+
         switch (RainbowPhaseState)
         {
             case RainbowPhase.Solo:
-                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDir, RainbowMainId, DeltaTime, 0);
+                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDirection, RainbowMainId, deltaTime, 0);
+
                 if (RainbowPhaseTimer >= SoloDuration)
                 {
                     RainbowCornerTargets[0] = RainbowGetCorner(0);
@@ -1087,34 +1146,41 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                     RainbowPhaseState = RainbowPhase.Duo;
                     RainbowPhaseTimer = 0f;
                 }
+
                 break;
 
             case RainbowPhase.Duo:
-                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDir, RainbowMainId, DeltaTime, 0);
-                RainbowMoveEntity(ref RainbowCloneCells[0], ref RainbowCloneTargets[0], ref RainbowCloneDirs[0], RainbowCloneIds[0], DeltaTime, 1);
+                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDirection, RainbowMainId, deltaTime, 0);
+                RainbowMoveEntity(ref RainbowCloneCells[0], ref RainbowCloneTargets[0], ref RainbowCloneDirections[0], RainbowCloneIds[0], deltaTime, 1);
+
                 if (RainbowPhaseTimer >= DuoSplitDelay)
                 {
                     RainbowSpawnClone(1);
                     RainbowPhaseState = RainbowPhase.Trio;
                     RainbowPhaseTimer = 0f;
                 }
+
                 break;
 
             case RainbowPhase.Trio:
-                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDir, RainbowMainId, DeltaTime, 0);
-                for (int index = 0; index < RainbowCloneCount; index++)
-                    RainbowMoveEntity(ref RainbowCloneCells[index], ref RainbowCloneTargets[index], ref RainbowCloneDirs[index], RainbowCloneIds[index], DeltaTime, 1 + index);
+                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDirection, RainbowMainId, deltaTime, 0);
+
+                for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
+                    RainbowMoveEntity(ref RainbowCloneCells[cloneIndex], ref RainbowCloneTargets[cloneIndex], ref RainbowCloneDirections[cloneIndex], RainbowCloneIds[cloneIndex], deltaTime, 1 + cloneIndex);
+
                 if (RainbowPhaseTimer >= TrioDuration)
                 {
                     RainbowPhaseState = RainbowPhase.Merging;
                     RainbowPhaseTimer = 0f;
                 }
+
                 break;
 
             case RainbowPhase.Merging:
-                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDir, RainbowMainId, DeltaTime * MergeSpeedMults[0], 0);
-                for (int index = 0; index < RainbowCloneCount; index++)
-                    RainbowMoveEntity(ref RainbowCloneCells[index], ref RainbowCloneTargets[index], ref RainbowCloneDirs[index], RainbowCloneIds[index], DeltaTime * MergeSpeedMults[1 + index], 1 + index);
+                RainbowMoveEntity(ref RainbowMainCell, ref RainbowMainTarget, ref RainbowMainDirection, RainbowMainId, deltaTime * MergeSpeedMultipliers[0], 0);
+
+                for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
+                    RainbowMoveEntity(ref RainbowCloneCells[cloneIndex], ref RainbowCloneTargets[cloneIndex], ref RainbowCloneDirections[cloneIndex], RainbowCloneIds[cloneIndex], deltaTime * MergeSpeedMultipliers[1 + cloneIndex], 1 + cloneIndex);
 
                 RainbowCheckMerges();
 
@@ -1124,16 +1190,18 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                     RainbowPhaseTimer = 0f;
                     RainbowWanderTargetTiles[0] = RainbowPickRandomWalkable();
                 }
+
                 break;
         }
     }
 
-    private void RainbowEatEntity(int EyeIndex)
+    private void RainbowEatEntity(int eyeIndex)
     {
-        if (EyeIndex == 0)
+        if (eyeIndex == 0)
         {
-            for (int index = RainbowCloneCount - 1; index >= 0; index--)
-                RainbowDestroyClone(index);
+            for (int cloneIndex = RainbowCloneCount - 1; cloneIndex >= 0; cloneIndex--)
+                RainbowDestroyClone(cloneIndex);
+
             RainbowMainEaten = true;
             ref var material = ref Scene.ECS.GetComponent<Material>(RainbowMainId);
             material.Albedo = Color.Transparent;
@@ -1141,7 +1209,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
         else
         {
-            RainbowDestroyClone(EyeIndex - 1);
+            RainbowDestroyClone(eyeIndex - 1);
         }
     }
 
@@ -1155,38 +1223,38 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         RainbowUpdateMainColor();
     }
 
-    private void RainbowSpawnClone(int SourceEyeIndex)
+    private void RainbowSpawnClone(int sourceEyeIndex)
     {
         int cloneIndex = RainbowCloneCount;
-        var sourceCell = SourceEyeIndex == 0 ? RainbowMainCell : RainbowCloneCells[SourceEyeIndex - 1];
-        var pos = RainbowLogicalPositions[SourceEyeIndex];
+        var sourceCell = sourceEyeIndex == 0 ? RainbowMainCell : RainbowCloneCells[sourceEyeIndex - 1];
+        var position = RainbowLogicalPositions[sourceEyeIndex];
 
-        RainbowCloneHues[cloneIndex] = RainbowMainHue;
         var color = RainbowFrightenedTimer > 0f ? FrightenedColor : LightFactory.HueToRGB(RainbowMainHue);
-        int entityId = LightFactory.CreateLight(Scene.ECS, pos, BodyRadius,
-            Color.Transparent, color, GhostZ, BodyTexture);
+        int entityId = LightFactory.CreateLight(Scene.ECS, position, BodyRadius,
+            Color.Transparent, color, GhostDepth, BodyTexture);
         Scene.ECS.AddComponent<MotionTrackable>(entityId);
 
-        var sourceDir = SourceEyeIndex == 0 ? RainbowMainDir : RainbowCloneDirs[SourceEyeIndex - 1];
-        var oppositeDir = (-sourceDir.dx, -sourceDir.dy);
-        if (oppositeDir != (0, 0) && RainbowCanMove(sourceCell.x, sourceCell.y, oppositeDir.Item1, oppositeDir.Item2))
+        var sourceDirection = sourceEyeIndex == 0 ? RainbowMainDirection : RainbowCloneDirections[sourceEyeIndex - 1];
+        var oppositeDirection = (-sourceDirection.dx, -sourceDirection.dy);
+
+        if (oppositeDirection != (0, 0) && RainbowCanMove(sourceCell.x, sourceCell.y, oppositeDirection.Item1, oppositeDirection.Item2))
         {
-            RainbowCloneDirs[cloneIndex] = oppositeDir;
-            RainbowCloneTargets[cloneIndex] = (sourceCell.x + oppositeDir.Item1, sourceCell.y + oppositeDir.Item2);
+            RainbowCloneDirections[cloneIndex] = oppositeDirection;
+            RainbowCloneTargets[cloneIndex] = (sourceCell.x + oppositeDirection.Item1, sourceCell.y + oppositeDirection.Item2);
         }
         else
         {
-            RainbowCloneDirs[cloneIndex] = sourceDir;
-            RainbowCloneTargets[cloneIndex] = (sourceCell.x + sourceDir.dx, sourceCell.y + sourceDir.dy);
+            RainbowCloneDirections[cloneIndex] = sourceDirection;
+            RainbowCloneTargets[cloneIndex] = (sourceCell.x + sourceDirection.dx, sourceCell.y + sourceDirection.dy);
         }
 
         RainbowCloneIds[cloneIndex] = entityId;
         RainbowCloneCells[cloneIndex] = sourceCell;
 
-        RainbowEyePositions[1 + cloneIndex] = pos;
-        RainbowPrevPositions[1 + cloneIndex] = pos;
-        RainbowEyeDirs[1 + cloneIndex] = RainbowCloneDirs[cloneIndex];
-        RainbowLogicalPositions[1 + cloneIndex] = pos;
+        RainbowEyePositions[1 + cloneIndex] = position;
+        RainbowPreviousPositions[1 + cloneIndex] = position;
+        RainbowEyeDirections[1 + cloneIndex] = RainbowCloneDirections[cloneIndex];
+        RainbowLogicalPositions[1 + cloneIndex] = position;
 
         RainbowWanderTargetTiles[1 + cloneIndex] = RainbowPickRandomWalkable();
         RainbowCornerTargets[1 + cloneIndex] = RainbowGetCorner(1 + cloneIndex);
@@ -1195,88 +1263,88 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
     private void RainbowCheckMerges()
     {
-        float thresholdSq = BodyRadius * 2f * BodyRadius * 2f;
+        float mergeDistanceSquared = BodyRadius * 2f * BodyRadius * 2f;
 
-        for (int index = RainbowCloneCount - 1; index >= 0; index--)
+        for (int cloneIndex = RainbowCloneCount - 1; cloneIndex >= 0; cloneIndex--)
         {
-            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[index]);
-            var clonePos = new Vector2(cloneTransform.Position.X, cloneTransform.Position.Y);
+            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[cloneIndex]);
+            var clonePosition = new Vector2(cloneTransform.Position.X, cloneTransform.Position.Y);
 
             ref var mainTransform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
-            var mainPos = new Vector2(mainTransform.Position.X, mainTransform.Position.Y);
-            if ((clonePos - mainPos).LengthSquared() < thresholdSq)
+            var mainPosition = new Vector2(mainTransform.Position.X, mainTransform.Position.Y);
+
+            if ((clonePosition - mainPosition).LengthSquared() < mergeDistanceSquared)
             {
-                RainbowDestroyClone(index);
+                RainbowDestroyClone(cloneIndex);
                 continue;
             }
 
-            bool merged = false;
-            for (int otherIndex = index - 1; otherIndex >= 0; otherIndex--)
+            for (int otherIndex = cloneIndex - 1; otherIndex >= 0; otherIndex--)
             {
                 ref var otherTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[otherIndex]);
-                var otherPos = new Vector2(otherTransform.Position.X, otherTransform.Position.Y);
-                if ((clonePos - otherPos).LengthSquared() < thresholdSq)
+                var otherPosition = new Vector2(otherTransform.Position.X, otherTransform.Position.Y);
+
+                if ((clonePosition - otherPosition).LengthSquared() < mergeDistanceSquared)
                 {
-                    RainbowDestroyClone(index);
-                    merged = true;
+                    RainbowDestroyClone(cloneIndex);
                     break;
                 }
             }
-            if (merged) continue;
         }
     }
 
-    private void RainbowDestroyClone(int CloneIndex)
+    private void RainbowDestroyClone(int cloneIndex)
     {
-        Scene.ECS.DestroyEntity(RainbowCloneIds[CloneIndex]);
+        Scene.ECS.DestroyEntity(RainbowCloneIds[cloneIndex]);
 
-        int last = RainbowCloneCount - 1;
-        if (CloneIndex < last)
+        int lastCloneIndex = RainbowCloneCount - 1;
+
+        if (cloneIndex < lastCloneIndex)
         {
-            RainbowCloneIds[CloneIndex] = RainbowCloneIds[last];
-            RainbowCloneCells[CloneIndex] = RainbowCloneCells[last];
-            RainbowCloneTargets[CloneIndex] = RainbowCloneTargets[last];
-            RainbowCloneDirs[CloneIndex] = RainbowCloneDirs[last];
-            RainbowCloneHues[CloneIndex] = RainbowCloneHues[last];
-            RainbowEyePositions[1 + CloneIndex] = RainbowEyePositions[1 + last];
-            RainbowPrevPositions[1 + CloneIndex] = RainbowPrevPositions[1 + last];
-            RainbowEyeDirs[1 + CloneIndex] = RainbowEyeDirs[1 + last];
-            RainbowLogicalPositions[1 + CloneIndex] = RainbowLogicalPositions[1 + last];
-            RainbowWanderTargetTiles[1 + CloneIndex] = RainbowWanderTargetTiles[1 + last];
+            RainbowCloneIds[cloneIndex] = RainbowCloneIds[lastCloneIndex];
+            RainbowCloneCells[cloneIndex] = RainbowCloneCells[lastCloneIndex];
+            RainbowCloneTargets[cloneIndex] = RainbowCloneTargets[lastCloneIndex];
+            RainbowCloneDirections[cloneIndex] = RainbowCloneDirections[lastCloneIndex];
+            RainbowEyePositions[1 + cloneIndex] = RainbowEyePositions[1 + lastCloneIndex];
+            RainbowPreviousPositions[1 + cloneIndex] = RainbowPreviousPositions[1 + lastCloneIndex];
+            RainbowEyeDirections[1 + cloneIndex] = RainbowEyeDirections[1 + lastCloneIndex];
+            RainbowLogicalPositions[1 + cloneIndex] = RainbowLogicalPositions[1 + lastCloneIndex];
+            RainbowWanderTargetTiles[1 + cloneIndex] = RainbowWanderTargetTiles[1 + lastCloneIndex];
         }
 
         RainbowCloneCount--;
     }
 
-    private void RainbowMoveEntity(ref (int x, int y) Cell, ref (int x, int y) Target,
-        ref (int dx, int dy) Dir, int EntityId, float DeltaTime, int EyeIndex)
+    private void RainbowMoveEntity(ref (int x, int y) cell, ref (int x, int y) targetCell,
+        ref (int dx, int dy) direction, int entityId, float deltaTime, int eyeIndex)
     {
-        float step = RainbowSpeed * DeltaTime;
-        if (EyeIndex == 0 && RainbowMainEaten)
-            step = RainbowSpeed * DeltaTime * EatenSpeedMultiplier;
-        else if (EyeIndex == 0 && !RainbowMainExitedHouse && !RainbowIsReleased())
-            step *= 0.5f;
+        float moveDistance = RainbowSpeed * deltaTime;
+        if (eyeIndex == 0 && RainbowMainEaten)
+            moveDistance = RainbowSpeed * deltaTime * EatenSpeedMultiplier;
+        else if (eyeIndex == 0 && !RainbowMainExitedHouse && !RainbowIsReleased())
+            moveDistance *= 0.5f;
         else if (RainbowFrightenedTimer > 0f)
-            step *= FrightenedSpeedMultiplier;
+            moveDistance *= FrightenedSpeedMultiplier;
 
-        ref var transform = ref Scene.ECS.GetComponent<Transform>(EntityId);
-        var pos = RainbowLogicalPositions[EyeIndex];
-        var target = Maze.CellCenter(Target.x, Target.y);
+        ref var transform = ref Scene.ECS.GetComponent<Transform>(entityId);
+        var position = RainbowLogicalPositions[eyeIndex];
+        var targetPosition = Maze.CellCenter(targetCell.x, targetCell.y);
 
-        var diff = target - pos;
-        float dist = diff.Length();
+        var targetOffset = targetPosition - position;
+        float distanceToTarget = targetOffset.Length();
 
-        if (dist <= step)
+        if (distanceToTarget <= moveDistance)
         {
-            var raw = Target;
-            Cell = (Maze.WrapX(raw.x), raw.y);
-            pos = Maze.CellCenter(Cell.x, Cell.y);
+            var unwrappedTargetCell = targetCell;
+            cell = (Maze.WrapX(unwrappedTargetCell.x), unwrappedTargetCell.y);
+            position = Maze.CellCenter(cell.x, cell.y);
 
-            if (EyeIndex == 0 && !RainbowMainExitedHouse && !RainbowMainEaten)
+            if (eyeIndex == 0 && !RainbowMainExitedHouse && !RainbowMainEaten)
             {
-                if (!Maze.InGhostHouse(Cell.x, Cell.y) && !Maze.IsGhostDoor(Cell.x, Cell.y))
+                if (!Maze.InGhostHouse(cell.x, cell.y) && !Maze.IsGhostDoor(cell.x, cell.y))
                 {
                     RainbowMainExitedHouse = true;
+
                     if (RainbowFrightenedTimer > 0f)
                     {
                         ref var material = ref Scene.ECS.GetComponent<Material>(RainbowMainId);
@@ -1287,82 +1355,84 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                 else
                 {
                     if (RainbowIsReleased())
-                        RainbowPickHouseExit(ref Cell, ref Target, ref Dir);
+                        RainbowPickHouseExit(ref cell, ref targetCell, ref direction);
                     else
-                        RainbowPickHouseWander(ref Cell, ref Target, ref Dir);
-                    target = Maze.CellCenter(Target.x, Target.y);
-                    diff = target - pos;
-                    dist = diff.Length();
+                        RainbowPickHouseWander(ref cell, ref targetCell, ref direction);
+                    targetPosition = Maze.CellCenter(targetCell.x, targetCell.y);
+                    targetOffset = targetPosition - position;
+                    distanceToTarget = targetOffset.Length();
                     goto applyMove;
                 }
             }
 
-            if (EyeIndex == 0 && RainbowMainEaten)
+            if (eyeIndex == 0 && RainbowMainEaten)
             {
-                RainbowPickEatenPath(ref Cell, ref Target, ref Dir);
-                target = Maze.CellCenter(Target.x, Target.y);
-                diff = target - pos;
-                dist = diff.Length();
+                RainbowPickEatenPath(ref cell, ref targetCell, ref direction);
+                targetPosition = Maze.CellCenter(targetCell.x, targetCell.y);
+                targetOffset = targetPosition - position;
+                distanceToTarget = targetOffset.Length();
                 goto applyMove;
             }
 
-            if (EyeIndex == 0 && RainbowMainRespawnTimer > 0f)
+            if (eyeIndex == 0 && RainbowMainRespawnTimer > 0f)
             {
-                RainbowPickHouseWander(ref Cell, ref Target, ref Dir);
-                target = Maze.CellCenter(Target.x, Target.y);
-                diff = target - pos;
-                dist = diff.Length();
+                RainbowPickHouseWander(ref cell, ref targetCell, ref direction);
+                targetPosition = Maze.CellCenter(targetCell.x, targetCell.y);
+                targetOffset = targetPosition - position;
+                distanceToTarget = targetOffset.Length();
                 goto applyMove;
             }
 
             if (RainbowFrightenedTimer > 0f)
-                RainbowPickRandom(ref Cell, ref Target, ref Dir);
+                RainbowPickRandom(ref cell, ref targetCell, ref direction);
             else
-                RainbowPickDirection(ref Cell, ref Target, ref Dir, EyeIndex);
+                RainbowPickDirection(ref cell, ref targetCell, ref direction, eyeIndex);
 
-            target = Maze.CellCenter(Target.x, Target.y);
-            diff = target - pos;
-            dist = diff.Length();
+            targetPosition = Maze.CellCenter(targetCell.x, targetCell.y);
+            targetOffset = targetPosition - position;
+            distanceToTarget = targetOffset.Length();
         }
 
-        applyMove:
-        if (dist > 0.01f)
+    applyMove:
+        if (distanceToTarget > 0.01f)
         {
-            var move = diff / dist * MathF.Min(step, dist);
-            pos += move;
+            var movementOffset = targetOffset / distanceToTarget * MathF.Min(moveDistance, distanceToTarget);
+            position += movementOffset;
         }
 
-        RainbowLogicalPositions[EyeIndex] = pos;
+        RainbowLogicalPositions[eyeIndex] = position;
 
-        float wobble = MathF.Sin(RainbowElapsedTime * 5f + EyeIndex * 2.5f) * 4f;
+        // Apply visual wobble without changing the maze position.
+        float wobble = MathF.Sin(RainbowElapsedTime * 5f + eyeIndex * 2.5f) * 4f;
         transform.Position = new Vector3(
-            pos.X + (Dir.dy != 0 ? wobble : 0f),
-            pos.Y + (Dir.dx != 0 ? wobble : 0f), GhostZ);
-        RainbowEyeDirs[EyeIndex] = Dir;
+            position.X + (direction.dy != 0 ? wobble : 0f),
+            position.Y + (direction.dx != 0 ? wobble : 0f), GhostDepth);
+        RainbowEyeDirections[eyeIndex] = direction;
 
         if (Player != null && !Player.PlayerCaught && RainbowMainExitedHouse
             && !RainbowMainEaten && RainbowMainRespawnTimer <= 0f)
         {
-            float catchDx = pos.X - Player.WorldPosition.X;
-            float catchDy = pos.Y - Player.WorldPosition.Y;
+            float playerOffsetX = position.X - Player.WorldPosition.X;
+            float playerOffsetY = position.Y - Player.WorldPosition.Y;
             float catchRadius = BodyRadius + Player.HitboxRadius;
-            if (catchDx * catchDx + catchDy * catchDy < catchRadius * catchRadius)
+
+            if (playerOffsetX * playerOffsetX + playerOffsetY * playerOffsetY < catchRadius * catchRadius)
             {
                 if (RainbowFrightenedTimer > 0f)
-                    RainbowEatEntity(EyeIndex);
+                    RainbowEatEntity(eyeIndex);
                 else
                     Player.PlayerCaught = true;
             }
         }
     }
 
-    private void RainbowPickEatenPath(ref (int x, int y) Cell, ref (int x, int y) Target,
-        ref (int dx, int dy) Dir)
+    private void RainbowPickEatenPath(ref (int x, int y) cell, ref (int x, int y) targetCell,
+        ref (int dx, int dy) direction)
     {
-        var (cx, cy) = Cell;
-        var (pdx, pdy) = Dir;
+        var (cellX, cellY) = cell;
+        var (previousDirectionX, previousDirectionY) = direction;
 
-        if (Maze.InGhostHouse(cx, cy))
+        if (Maze.InGhostHouse(cellX, cellY))
         {
             RainbowMainEaten = false;
             RainbowMainRespawnTimer = RespawnDelay;
@@ -1372,253 +1442,264 @@ public class PacmanGhostAI : com.radiant.engine.core.System
             material.Albedo = Color.Transparent;
             material.Emissive = LightFactory.HueToRGB(RainbowMainHue);
 
-            RainbowPickHouseWander(ref Cell, ref Target, ref Dir);
+            RainbowPickHouseWander(ref cell, ref targetCell, ref direction);
             return;
         }
 
-        if (Maze.IsGhostDoor(cx, cy))
+        if (Maze.IsGhostDoor(cellX, cellY))
         {
-            Dir = (0, 1);
-            Target = (cx, cy + 1);
+            direction = (0, 1);
+            targetCell = (cellX, cellY + 1);
             return;
         }
 
         int targetX = Maze.HouseDoorLeft;
         int targetY = Maze.HouseDoorY;
 
-        Span<(int dx, int dy)> options = stackalloc (int, int)[4];
-        int count = 0;
+        Span<(int dx, int dy)> availableDirections = stackalloc (int, int)[4];
+        int directionCount = 0;
 
-        for (int dir = 0; dir < 4; dir++)
+        for (int directionIndex = 0; directionIndex < 4; directionIndex++)
         {
-            int ndx = DXs[dir], ndy = DYs[dir];
-            if (!Maze.CanMove(cx, cy, ndx, ndy)) continue;
-            if (ndx == -pdx && ndy == -pdy) continue;
-            options[count++] = (ndx, ndy);
+            int nextDirectionX = HorizontalDirections[directionIndex], nextDirectionY = VerticalDirections[directionIndex];
+            if (!Maze.CanMove(cellX, cellY, nextDirectionX, nextDirectionY)) continue;
+            if (nextDirectionX == -previousDirectionX && nextDirectionY == -previousDirectionY) continue;
+
+            availableDirections[directionCount++] = (nextDirectionX, nextDirectionY);
         }
 
-        if (count == 0)
+        if (directionCount == 0)
         {
-            Dir = (-pdx, -pdy);
-            Target = (cx - pdx, cy - pdy);
+            direction = (-previousDirectionX, -previousDirectionY);
+            targetCell = (cellX - previousDirectionX, cellY - previousDirectionY);
             return;
         }
 
-        if (count == 1)
+        if (directionCount == 1)
         {
-            var only = options[0];
-            Dir = only;
-            Target = (cx + only.dx, cy + only.dy);
+            var onlyDirection = availableDirections[0];
+            direction = onlyDirection;
+            targetCell = (cellX + onlyDirection.dx, cellY + onlyDirection.dy);
             return;
         }
 
-        float bestDist = float.MaxValue;
-        (int dx, int dy) bestDir = options[0];
+        float bestDistanceSquared = float.MaxValue;
+        (int dx, int dy) bestDirection = availableDirections[0];
 
-        for (int optIndex = 0; optIndex < count; optIndex++)
+        for (int optionIndex = 0; optionIndex < directionCount; optionIndex++)
         {
-            float distX = cx + options[optIndex].dx - targetX;
-            float distY = cy + options[optIndex].dy - targetY;
-            float dist = distX * distX + distY * distY;
-            if (dist < bestDist)
+            float targetOffsetX = cellX + availableDirections[optionIndex].dx - targetX;
+            float targetOffsetY = cellY + availableDirections[optionIndex].dy - targetY;
+            float distanceSquared = targetOffsetX * targetOffsetX + targetOffsetY * targetOffsetY;
+
+            if (distanceSquared < bestDistanceSquared)
             {
-                bestDist = dist;
-                bestDir = options[optIndex];
+                bestDistanceSquared = distanceSquared;
+                bestDirection = availableDirections[optionIndex];
             }
         }
 
-        Dir = bestDir;
-        Target = (cx + bestDir.dx, cy + bestDir.dy);
+        direction = bestDirection;
+        targetCell = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
-    private void RainbowPickRandom(ref (int x, int y) Cell, ref (int x, int y) Target,
-        ref (int dx, int dy) Dir)
+    private void RainbowPickRandom(ref (int x, int y) cell, ref (int x, int y) targetCell,
+        ref (int dx, int dy) direction)
     {
-        var (cx, cy) = Cell;
-        var (pdx, pdy) = Dir;
+        var (cellX, cellY) = cell;
+        var (previousDirectionX, previousDirectionY) = direction;
 
-        Span<(int dx, int dy)> options = stackalloc (int, int)[4];
-        int count = 0;
+        Span<(int dx, int dy)> availableDirections = stackalloc (int, int)[4];
+        int directionCount = 0;
 
-        for (int dir = 0; dir < 4; dir++)
+        for (int directionIndex = 0; directionIndex < 4; directionIndex++)
         {
-            if (!RainbowCanMove(cx, cy, DXs[dir], DYs[dir])) continue;
-            if (DXs[dir] == -pdx && DYs[dir] == -pdy) continue;
-            options[count++] = (DXs[dir], DYs[dir]);
+            if (!RainbowCanMove(cellX, cellY, HorizontalDirections[directionIndex], VerticalDirections[directionIndex])) continue;
+            if (HorizontalDirections[directionIndex] == -previousDirectionX && VerticalDirections[directionIndex] == -previousDirectionY) continue;
+
+            availableDirections[directionCount++] = (HorizontalDirections[directionIndex], VerticalDirections[directionIndex]);
         }
 
-        if (count == 0)
+        if (directionCount == 0)
         {
-            Dir = (-pdx, -pdy);
-            Target = (cx - pdx, cy - pdy);
+            direction = (-previousDirectionX, -previousDirectionY);
+            targetCell = (cellX - previousDirectionX, cellY - previousDirectionY);
             return;
         }
 
-        var pick = options[Rng.Next(count)];
-        Dir = pick;
-        Target = (cx + pick.dx, cy + pick.dy);
+        var chosenDirection = availableDirections[RandomGenerator.Next(directionCount)];
+        direction = chosenDirection;
+        targetCell = (cellX + chosenDirection.dx, cellY + chosenDirection.dy);
     }
 
-    private void RainbowPickHouseExit(ref (int x, int y) Cell, ref (int x, int y) Target,
-        ref (int dx, int dy) Dir)
+    private void RainbowPickHouseExit(ref (int x, int y) cell, ref (int x, int y) targetCell,
+        ref (int dx, int dy) direction)
     {
-        var (cx, cy) = Cell;
-        int doorL = Maze.HouseDoorLeft;
-        int doorR = Maze.HouseDoorRight;
+        var (cellX, cellY) = cell;
+        int doorLeft = Maze.HouseDoorLeft;
+        int doorRight = Maze.HouseDoorRight;
 
-        if (cx < doorL && Maze.CanMove(cx, cy, 1, 0))
+        if (cellX < doorLeft && Maze.CanMove(cellX, cellY, 1, 0))
         {
-            Dir = (1, 0);
-            Target = (cx + 1, cy);
+            direction = (1, 0);
+            targetCell = (cellX + 1, cellY);
         }
-        else if (cx > doorR && Maze.CanMove(cx, cy, -1, 0))
+        else if (cellX > doorRight && Maze.CanMove(cellX, cellY, -1, 0))
         {
-            Dir = (-1, 0);
-            Target = (cx - 1, cy);
+            direction = (-1, 0);
+            targetCell = (cellX - 1, cellY);
         }
-        else if (Maze.CanMove(cx, cy, 0, -1))
+        else if (Maze.CanMove(cellX, cellY, 0, -1))
         {
-            Dir = (0, -1);
-            Target = (cx, cy - 1);
+            direction = (0, -1);
+            targetCell = (cellX, cellY - 1);
         }
         else
         {
-            for (int dir = 0; dir < 4; dir++)
-                if (Maze.CanMove(cx, cy, DXs[dir], DYs[dir]))
+            for (int directionIndex = 0; directionIndex < 4; directionIndex++)
+                if (Maze.CanMove(cellX, cellY, HorizontalDirections[directionIndex], VerticalDirections[directionIndex]))
                 {
-                    Dir = (DXs[dir], DYs[dir]);
-                    Target = (cx + DXs[dir], cy + DYs[dir]);
+                    direction = (HorizontalDirections[directionIndex], VerticalDirections[directionIndex]);
+                    targetCell = (cellX + HorizontalDirections[directionIndex], cellY + VerticalDirections[directionIndex]);
                     return;
                 }
         }
     }
 
-    private void RainbowPickHouseWander(ref (int x, int y) Cell, ref (int x, int y) Target,
-        ref (int dx, int dy) Dir)
+    private void RainbowPickHouseWander(ref (int x, int y) cell, ref (int x, int y) targetCell,
+        ref (int dx, int dy) direction)
     {
-        var (cx, cy) = Cell;
-        var (pdx, _) = Dir;
+        var (cellX, cellY) = cell;
+        var (previousDirectionX, _) = direction;
 
-        if (pdx == 0)
-            pdx = 1;
+        if (previousDirectionX == 0)
+            previousDirectionX = 1;
 
-        if (Maze.CanMove(cx, cy, pdx, 0) && Maze.InGhostHouse(cx + pdx, cy))
+        if (Maze.CanMove(cellX, cellY, previousDirectionX, 0) && Maze.InGhostHouse(cellX + previousDirectionX, cellY))
         {
-            Dir = (pdx, 0);
-            Target = (cx + pdx, cy);
+            direction = (previousDirectionX, 0);
+            targetCell = (cellX + previousDirectionX, cellY);
         }
-        else if (Maze.CanMove(cx, cy, -pdx, 0) && Maze.InGhostHouse(cx - pdx, cy))
+        else if (Maze.CanMove(cellX, cellY, -previousDirectionX, 0) && Maze.InGhostHouse(cellX - previousDirectionX, cellY))
         {
-            Dir = (-pdx, 0);
-            Target = (cx - pdx, cy);
+            direction = (-previousDirectionX, 0);
+            targetCell = (cellX - previousDirectionX, cellY);
         }
         else
         {
-            Dir = (0, 0);
-            Target = (cx, cy);
+            direction = (0, 0);
+            targetCell = (cellX, cellY);
         }
     }
 
-    private void RainbowPickDirection(ref (int x, int y) Cell, ref (int x, int y) Target,
-        ref (int dx, int dy) Dir, int EyeIndex)
+    private void RainbowPickDirection(ref (int x, int y) cell, ref (int x, int y) targetCell,
+        ref (int dx, int dy) direction, int eyeIndex)
     {
-        var (cx, cy) = Cell;
-        var (pdx, pdy) = Dir;
+        var (cellX, cellY) = cell;
+        var (previousDirectionX, previousDirectionY) = direction;
 
         (int tx, int ty) targetTile;
+
         if (RainbowPhaseState == RainbowPhase.Merging)
         {
-            targetTile = RainbowNearestSiblingCell(EyeIndex);
+            targetTile = RainbowNearestSiblingCell(eyeIndex);
         }
         else if ((RainbowPhaseState == RainbowPhase.Duo || RainbowPhaseState == RainbowPhase.Trio) && Player != null)
         {
             var playerCell = Player.Cell;
-            var cornerCell = RainbowCornerTargets[EyeIndex];
+            var cornerCell = RainbowCornerTargets[eyeIndex];
             targetTile = ((playerCell.x * 3 + cornerCell.x * 2) / 5, (playerCell.y * 3 + cornerCell.y * 2) / 5);
         }
         else
         {
-            targetTile = RainbowWanderTargetTiles[EyeIndex];
-            float manhattan = MathF.Abs(cx - targetTile.tx) + MathF.Abs(cy - targetTile.ty);
-            if (manhattan <= 2 || Maze.IsWall(targetTile.tx, targetTile.ty))
-                RainbowWanderTargetTiles[EyeIndex] = targetTile = RainbowPickRandomWalkable();
+            targetTile = RainbowWanderTargetTiles[eyeIndex];
+            float manhattanDistance = MathF.Abs(cellX - targetTile.tx) + MathF.Abs(cellY - targetTile.ty);
+            if (manhattanDistance <= 2 || Maze.IsWall(targetTile.tx, targetTile.ty))
+                RainbowWanderTargetTiles[eyeIndex] = targetTile = RainbowPickRandomWalkable();
         }
 
-        Span<(int dx, int dy)> options = stackalloc (int, int)[4];
-        int count = 0;
+        Span<(int dx, int dy)> availableDirections = stackalloc (int, int)[4];
+        int directionCount = 0;
 
-        for (int dir = 0; dir < 4; dir++)
+        for (int directionIndex = 0; directionIndex < 4; directionIndex++)
         {
-            if (!RainbowCanMove(cx, cy, DXs[dir], DYs[dir])) continue;
-            if (DXs[dir] == -pdx && DYs[dir] == -pdy) continue;
-            options[count++] = (DXs[dir], DYs[dir]);
+            if (!RainbowCanMove(cellX, cellY, HorizontalDirections[directionIndex], VerticalDirections[directionIndex])) continue;
+            if (HorizontalDirections[directionIndex] == -previousDirectionX && VerticalDirections[directionIndex] == -previousDirectionY) continue;
+
+            availableDirections[directionCount++] = (HorizontalDirections[directionIndex], VerticalDirections[directionIndex]);
         }
 
-        if (count == 0)
+        if (directionCount == 0)
         {
-            Dir = (-pdx, -pdy);
-            Target = (cx - pdx, cy - pdy);
+            direction = (-previousDirectionX, -previousDirectionY);
+            targetCell = (cellX - previousDirectionX, cellY - previousDirectionY);
             return;
         }
 
-        if (count == 1)
+        if (directionCount == 1)
         {
-            var only = options[0];
-            Dir = only;
-            Target = (cx + only.dx, cy + only.dy);
+            var onlyDirection = availableDirections[0];
+            direction = onlyDirection;
+            targetCell = (cellX + onlyDirection.dx, cellY + onlyDirection.dy);
             return;
         }
 
-        float bestDist = float.MaxValue;
-        (int dx, int dy) bestDir = options[0];
+        float bestDistanceSquared = float.MaxValue;
+        (int dx, int dy) bestDirection = availableDirections[0];
 
-        for (int optIndex = 0; optIndex < count; optIndex++)
+        for (int optionIndex = 0; optionIndex < directionCount; optionIndex++)
         {
-            float distX = cx + options[optIndex].dx - targetTile.tx;
-            float distY = cy + options[optIndex].dy - targetTile.ty;
-            float dist = distX * distX + distY * distY;
-            if (dist < bestDist)
+            float targetOffsetX = cellX + availableDirections[optionIndex].dx - targetTile.tx;
+            float targetOffsetY = cellY + availableDirections[optionIndex].dy - targetTile.ty;
+            float distanceSquared = targetOffsetX * targetOffsetX + targetOffsetY * targetOffsetY;
+
+            if (distanceSquared < bestDistanceSquared)
             {
-                bestDist = dist;
-                bestDir = options[optIndex];
+                bestDistanceSquared = distanceSquared;
+                bestDirection = availableDirections[optionIndex];
             }
         }
 
-        Dir = bestDir;
-        Target = (cx + bestDir.dx, cy + bestDir.dy);
+        direction = bestDirection;
+        targetCell = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
-    private (int x, int y) RainbowNearestSiblingCell(int EyeIndex)
+    private (int x, int y) RainbowNearestSiblingCell(int eyeIndex)
     {
-        var self = EyeIndex == 0 ? RainbowMainCell : RainbowCloneCells[EyeIndex - 1];
-        float bestDist = float.MaxValue;
-        (int x, int y) best = self;
+        var currentCell = eyeIndex == 0 ? RainbowMainCell : RainbowCloneCells[eyeIndex - 1];
+        float bestDistanceSquared = float.MaxValue;
+        (int x, int y) nearestCell = currentCell;
 
-        int total = 1 + RainbowCloneCount;
-        for (int index = 0; index < total; index++)
+        int rainbowGhostCount = 1 + RainbowCloneCount;
+
+        for (int siblingIndex = 0; siblingIndex < rainbowGhostCount; siblingIndex++)
         {
-            if (index == EyeIndex) continue;
-            var other = index == 0 ? RainbowMainCell : RainbowCloneCells[index - 1];
-            float distX = self.x - other.x;
-            float distY = self.y - other.y;
-            float dist = distX * distX + distY * distY;
-            if (dist < bestDist)
+            if (siblingIndex == eyeIndex) continue;
+
+            var siblingCell = siblingIndex == 0 ? RainbowMainCell : RainbowCloneCells[siblingIndex - 1];
+            float targetOffsetX = currentCell.x - siblingCell.x;
+            float targetOffsetY = currentCell.y - siblingCell.y;
+            float distanceSquared = targetOffsetX * targetOffsetX + targetOffsetY * targetOffsetY;
+
+            if (distanceSquared < bestDistanceSquared)
             {
-                bestDist = dist;
-                best = other;
+                bestDistanceSquared = distanceSquared;
+                nearestCell = siblingCell;
             }
         }
 
-        return best;
+        return nearestCell;
     }
 
-    private bool RainbowCanMove(int CellX, int CellY, int DirX, int DirY)
+    private bool RainbowCanMove(int cellX, int cellY, int directionX, int directionY)
     {
-        if (!Maze.CanMove(CellX, CellY, DirX, DirY)) return false;
+        if (!Maze.CanMove(cellX, cellY, directionX, directionY)) return false;
         if (RainbowMainEaten) return true;
-        int nextX = Maze.WrapX(CellX + DirX), nextY = CellY + DirY;
-        if (Maze.InGhostHouse(nextX, nextY)) return false;
-        if (Maze.IsGhostDoor(nextX, nextY)) return false;
+
+        int nextCellX = Maze.WrapX(cellX + directionX), nextCellY = cellY + directionY;
+        if (Maze.InGhostHouse(nextCellX, nextCellY)) return false;
+        if (Maze.IsGhostDoor(nextCellX, nextCellY)) return false;
+
         return true;
     }
 
@@ -1626,26 +1707,29 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     {
         if (RainbowMainRespawnTimer > 0f) return false;
         if (RainbowReleaseTime > 0 && RainbowElapsedTime >= RainbowReleaseTime) return true;
+
         if (RainbowReleaseAtCoinPercent > 0 && Player != null && Player.CoinsTotal > 0)
         {
             float coinPercent = (float)Player.CoinsCollected / Player.CoinsTotal;
             if (coinPercent >= RainbowReleaseAtCoinPercent) return true;
         }
+
         if (RainbowReleaseTime <= 0 && RainbowReleaseAtCoinPercent <= 0) return true;
+
         return false;
     }
 
     private void RainbowShiftEyeHistory()
     {
-        RainbowEyePositions[0] = RainbowPrevPositions[0];
+        RainbowEyePositions[0] = RainbowPreviousPositions[0];
         ref var mainTransform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
-        RainbowPrevPositions[0] = new Vector2(mainTransform.Position.X, mainTransform.Position.Y);
+        RainbowPreviousPositions[0] = new Vector2(mainTransform.Position.X, mainTransform.Position.Y);
 
-        for (int index = 0; index < RainbowCloneCount; index++)
+        for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
         {
-            RainbowEyePositions[1 + index] = RainbowPrevPositions[1 + index];
-            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[index]);
-            RainbowPrevPositions[1 + index] = new Vector2(cloneTransform.Position.X, cloneTransform.Position.Y);
+            RainbowEyePositions[1 + cloneIndex] = RainbowPreviousPositions[1 + cloneIndex];
+            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[cloneIndex]);
+            RainbowPreviousPositions[1 + cloneIndex] = new Vector2(cloneTransform.Position.X, cloneTransform.Position.Y);
         }
     }
 
@@ -1657,99 +1741,103 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         material.Emissive = color;
     }
 
-    private void RainbowUpdateCloneColor(int CloneIndex)
+    private void RainbowUpdateCloneColor(int cloneIndex)
     {
         var color = LightFactory.HueToRGB(RainbowMainHue);
-        ref var material = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[CloneIndex]);
+        ref var material = ref Scene.ECS.GetComponent<Material>(RainbowCloneIds[cloneIndex]);
         material.Albedo = Color.Transparent;
         material.Emissive = color;
     }
 
-    private (int x, int y) RainbowGetCorner(int EyeIndex) => (EyeIndex % 4) switch
+    private (int x, int y) RainbowGetCorner(int eyeIndex) => (eyeIndex % 4) switch
     {
         0 => (2, 1),
-        1 => (Maze.Cols - 3, 1),
+        1 => (Maze.Columns - 3, 1),
         2 => (0, Maze.Rows - 2),
-        _ => (Maze.Cols - 1, Maze.Rows - 2),
+        _ => (Maze.Columns - 1, Maze.Rows - 2),
     };
 
     private (int x, int y) RainbowPickRandomWalkable()
     {
         for (int attempt = 0; attempt < 100; attempt++)
         {
-            int cellX = Rng.Next(Maze.Cols);
-            int cellY = Rng.Next(Maze.Rows);
+            int cellX = RandomGenerator.Next(Maze.Columns);
+            int cellY = RandomGenerator.Next(Maze.Rows);
             if (!Maze.IsWall(cellX, cellY) && !Maze.InGhostHouse(cellX, cellY) && !Maze.IsGhostDoor(cellX, cellY))
                 return (cellX, cellY);
         }
-        return (Maze.Cols / 2, 0);
+
+        return (Maze.Columns / 2, 0);
     }
 
     public override void LateRender()
     {
         if (Geometry.IsDebugHidingGameplay) return;
+
         DrawGhostEyes();
     }
 
     void DrawGhostEyes()
     {
-        int regularCount = GhostCount;
-        int rainbowCount = RainbowTotalCount;
-        if (regularCount == 0 && rainbowCount == 0) return;
+        int regularGhostCount = GhostCount;
+        int rainbowGhostCount = RainbowTotalCount;
+        if (regularGhostCount == 0 && rainbowGhostCount == 0) return;
 
-        float sx = Renderer.ScreenWidth / Renderer.VirtualSize.X;
-        float sy = Renderer.ScreenHeight / Renderer.VirtualSize.Y;
+        float horizontalScale = Renderer.ScreenWidth / Renderer.VirtualSize.X;
+        float verticalScale = Renderer.ScreenHeight / Renderer.VirtualSize.Y;
 
         Renderer.Reset()
             .Configure(BlendState.AlphaBlend)
             .SetTarget(null);
 
-        for (int i = 0; i < regularCount; i++)
+        for (int ghostIndex = 0; ghostIndex < regularGhostCount; ghostIndex++)
         {
-            if (GhostIds[i] == -1 || !Scene.ECS.IsAlive(GhostIds[i])) continue;
-            if (Scene.ECS.IsDisabled(GhostIds[i])) continue;
-            float radius = IsGhostFrightened(i) ? BodyRadius * FrightenedShrink : BodyRadius;
-            float eyeR = radius * 0.667f;
-            float eyeD = eyeR * 2f;
-            float eyeOff = radius * 0.133f;
-            var dir = GetGhostDir(i);
-            var eyePos = GetGhostEyePosition(i);
-            float cx = eyePos.X + dir.dx * eyeOff;
-            float cy = eyePos.Y + dir.dy * eyeOff;
+            if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
+            if (Scene.ECS.IsDisabled(GhostIds[ghostIndex])) continue;
+
+            float radius = IsGhostFrightened(ghostIndex) ? BodyRadius * FrightenedShrink : BodyRadius;
+            float eyeRadius = radius * 0.667f;
+            float eyeDiameter = eyeRadius * 2f;
+            float eyeOffset = radius * 0.133f;
+            var direction = GetGhostDirection(ghostIndex);
+            var eyePosition = GetGhostEyePosition(ghostIndex);
+            float eyeCenterX = eyePosition.X + direction.dx * eyeOffset;
+            float eyeCenterY = eyePosition.Y + direction.dy * eyeOffset;
 
             Color eyeColor;
-            if (IsGhostEaten(i))
+            if (IsGhostEaten(ghostIndex))
                 eyeColor = Color.White;
-            else if (IsGhostFrightened(i))
+            else if (IsGhostFrightened(ghostIndex))
                 eyeColor = Color.White;
             else
-                eyeColor = GetGhostType(i) == PacmanGhostType.Shadow ? Color.White : Color.Black;
+                eyeColor = GetGhostType(ghostIndex) == PacmanGhostType.Shadow ? Color.White : Color.Black;
 
             if (EyesTexture != null)
                 Renderer.DrawTexture(EyesTexture,
                     new Rectangle(
-                        (int)((cx - eyeR) * sx),
-                        (int)((cy - eyeR) * sy),
-                        (int)(eyeD * sx),
-                        (int)(eyeD * sy)),
+                        (int)((eyeCenterX - eyeRadius) * horizontalScale),
+                        (int)((eyeCenterY - eyeRadius) * verticalScale),
+                        (int)(eyeDiameter * horizontalScale),
+                        (int)(eyeDiameter * verticalScale)),
                     eyeColor);
         }
 
-        for (int i = 0; i < rainbowCount; i++)
+        for (int rainbowIndex = 0; rainbowIndex < rainbowGhostCount; rainbowIndex++)
         {
-            int rainbowEntityId = i == 0 ? RainbowMainId : RainbowCloneIds[i - 1];
+            int rainbowEntityId = rainbowIndex == 0 ? RainbowMainId : RainbowCloneIds[rainbowIndex - 1];
             if (!Scene.ECS.IsAlive(rainbowEntityId)) continue;
+
             float radius = RainbowIsFrightened ? BodyRadius * FrightenedShrink : BodyRadius;
-            float eyeR = radius * 0.667f;
-            float eyeD = eyeR * 2f;
-            float eyeOff = radius * 0.133f;
-            var dir = GetRainbowEyeDir(i);
-            var eyePos = GetRainbowEyePosition(i);
-            float cx = eyePos.X + dir.dx * eyeOff;
-            float cy = eyePos.Y + dir.dy * eyeOff;
+            float eyeRadius = radius * 0.667f;
+            float eyeDiameter = eyeRadius * 2f;
+            float eyeOffset = radius * 0.133f;
+            var direction = GetRainbowEyeDirection(rainbowIndex);
+            var eyePosition = GetRainbowEyePosition(rainbowIndex);
+            float eyeCenterX = eyePosition.X + direction.dx * eyeOffset;
+            float eyeCenterY = eyePosition.Y + direction.dy * eyeOffset;
 
             Color eyeColor;
-            if (i == 0 && RainbowIsMainEaten)
+            if (rainbowIndex == 0 && RainbowIsMainEaten)
                 eyeColor = Color.White;
             else if (RainbowIsFrightened)
                 eyeColor = Color.White;
@@ -1759,10 +1847,10 @@ public class PacmanGhostAI : com.radiant.engine.core.System
             if (EyesTexture != null)
                 Renderer.DrawTexture(EyesTexture,
                     new Rectangle(
-                        (int)((cx - eyeR) * sx),
-                        (int)((cy - eyeR) * sy),
-                        (int)(eyeD * sx),
-                        (int)(eyeD * sy)),
+                        (int)((eyeCenterX - eyeRadius) * horizontalScale),
+                        (int)((eyeCenterY - eyeRadius) * verticalScale),
+                        (int)(eyeDiameter * horizontalScale),
+                        (int)(eyeDiameter * verticalScale)),
                     eyeColor);
         }
 

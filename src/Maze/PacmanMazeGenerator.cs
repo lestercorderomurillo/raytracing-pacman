@@ -9,567 +9,608 @@ namespace RaytracingPacman;
 /// </summary>
 public static class PacmanMazeGenerator
 {
-    private const int CellRows = 9;
-    private const int CellCols = 5;
-    private const int SubRows = 31;  // CellRows*3+1+3
-    private const int SubCols = 16;  // CellCols*3-1+2
-    private const int MidCols = 14;  // SubCols-2
-    private const int FullCols = 28; // MidCols*2
+    private const int CellRowCount = 9;
+    private const int CellColumnCount = 5;
+    private const int TileRowCount = 31;  // CellRowCount * 3 + 1 + 3
+    private const int HalfTileColumnCount = 16;  // CellColumnCount * 3 - 1 + 2
+    private const int MirrorColumn = 14;  // HalfTileColumnCount - 2
+    private const int FullColumnCount = 28; // MirrorColumn * 2
 
     private const int Up = 0;
-    private const int Rt = 1;
-    private const int Dn = 2;
-    private const int Lt = 3;
+    private const int Right = 1;
+    private const int Down = 2;
+    private const int Left = 3;
 
-    public static string[] Generate(int Seed = -1)
+    public static string[] Generate(int seed = -1)
     {
-        var Rng = Seed >= 0 ? new Random(Seed) : new Random();
-        for (int Attempt = 0; Attempt < 300; Attempt++)
+        var randomGenerator = seed >= 0 ? new Random(seed) : new Random();
+
+        for (int attempt = 0; attempt < 300; attempt++)
         {
-            var B = new MazeBuilder(Rng);
-            var Result = B.Build();
-            if (Result != null) return Result;
+            var builder = new MazeBuilder(randomGenerator);
+            var result = builder.Build();
+            if (result != null) return result;
         }
+
         return FallbackLayout();
     }
 
     private sealed class Cell
     {
-        public int X, Y;
+        public int Column, Row;
         public bool Filled;
-        public readonly bool[] Connect = new bool[4];
-        public readonly Cell[] Next = new Cell[4];
-        public int No = -1;
-        public int Group = -1;
+        public readonly bool[] Connections = new bool[4];
+        public readonly Cell[] Neighbors = new Cell[4];
+        public int GroupIndex = -1;
         public bool IsRaiseHeightCandidate;
         public bool IsShrinkWidthCandidate;
         public bool RaiseHeight;
         public bool ShrinkWidth;
         public bool TopTunnel;
-        public bool IsJoinCandidate;
-        public bool IsEdgeTunnelCandidate;
-        public bool IsVoidTunnelCandidate;
-        public bool IsSingleDeadEndCandidate;
-        public bool IsDoubleDeadEndCandidate;
-        public int SingleDeadEndDir;
-        public int FinalX, FinalY, FinalW, FinalH;
+        public int SingleDeadEndDirection;
+        public int FinalColumn, FinalRow, FinalWidth, FinalHeight;
     }
 
     private sealed class MazeBuilder
     {
-        private readonly Random Rng;
-        private readonly Cell[] Cells = new Cell[CellRows * CellCols];
-        private readonly int[] TallRows = new int[CellCols];
-        private readonly int[] NarrowCols = new int[CellRows];
+        private readonly Random RandomGenerator;
+        private readonly Cell[] Cells = new Cell[CellRowCount * CellColumnCount];
+        private readonly int[] TallRows = new int[CellColumnCount];
+        private readonly int[] NarrowColumns = new int[CellRowCount];
 
-        public MazeBuilder(Random Rng) { this.Rng = Rng; }
+        public MazeBuilder(Random randomGenerator) { this.RandomGenerator = randomGenerator; }
 
         public string[] Build()
         {
             Reset();
-            Gen();
+            GeneratePieces();
             if (!IsDesirable()) return null;
-            SetUpScaleCoords();
+
+            SetUpScaledCoordinates();
             JoinWalls();
             if (!CreateTunnels()) return null;
+
             return GetTiles();
         }
 
-        private void Shuffle<T>(List<T> List)
+        private void Shuffle<T>(List<T> items)
         {
-            for (int I = List.Count - 1; I > 0; I--)
+            for (int itemIndex = items.Count - 1; itemIndex > 0; itemIndex--)
             {
-                int J = Rng.Next(I + 1);
-                (List[I], List[J]) = (List[J], List[I]);
+                int swapIndex = RandomGenerator.Next(itemIndex + 1);
+                (items[itemIndex], items[swapIndex]) = (items[swapIndex], items[itemIndex]);
             }
         }
 
-        private Cell RandElement(List<Cell> List)
+        private Cell RandomElement(List<Cell> candidates)
         {
-            return List.Count == 0 ? null : List[Rng.Next(List.Count)];
+            return candidates.Count == 0 ? null : candidates[RandomGenerator.Next(candidates.Count)];
         }
 
         private void Reset()
         {
-            for (int I = 0; I < CellRows * CellCols; I++)
-                Cells[I] = new Cell { X = I % CellCols, Y = I / CellCols };
+            for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
+                Cells[cellIndex] = new Cell { Column = cellIndex % CellColumnCount, Row = cellIndex / CellColumnCount };
 
-            for (int I = 0; I < CellRows * CellCols; I++)
+            for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
             {
-                var C = Cells[I];
-                if (C.X > 0) C.Next[Lt] = Cells[I - 1];
-                if (C.X < CellCols - 1) C.Next[Rt] = Cells[I + 1];
-                if (C.Y > 0) C.Next[Up] = Cells[I - CellCols];
-                if (C.Y < CellRows - 1) C.Next[Dn] = Cells[I + CellCols];
+                var cell = Cells[cellIndex];
+                if (cell.Column > 0) cell.Neighbors[Left] = Cells[cellIndex - 1];
+                if (cell.Column < CellColumnCount - 1) cell.Neighbors[Right] = Cells[cellIndex + 1];
+                if (cell.Row > 0) cell.Neighbors[Up] = Cells[cellIndex - CellColumnCount];
+                if (cell.Row < CellRowCount - 1) cell.Neighbors[Down] = Cells[cellIndex + CellColumnCount];
             }
 
             // Ghost house: cells (0,3), (1,3), (0,4), (1,4)
-            int Idx = 3 * CellCols;
-            var G = Cells[Idx];
-            G.Filled = true; G.Connect[Lt] = G.Connect[Rt] = G.Connect[Dn] = true;
+            int houseCellIndex = 3 * CellColumnCount;
+            var ghostHouseCell = Cells[houseCellIndex];
+            ghostHouseCell.Filled = true;
+            ghostHouseCell.Connections[Left] = ghostHouseCell.Connections[Right] = ghostHouseCell.Connections[Down] = true;
 
-            Idx++;
-            G = Cells[Idx];
-            G.Filled = true; G.Connect[Lt] = G.Connect[Dn] = true;
+            houseCellIndex++;
+            ghostHouseCell = Cells[houseCellIndex];
+            ghostHouseCell.Filled = true;
+            ghostHouseCell.Connections[Left] = ghostHouseCell.Connections[Down] = true;
 
-            Idx += CellCols - 1;
-            G = Cells[Idx];
-            G.Filled = true; G.Connect[Lt] = G.Connect[Up] = G.Connect[Rt] = true;
+            houseCellIndex += CellColumnCount - 1;
+            ghostHouseCell = Cells[houseCellIndex];
+            ghostHouseCell.Filled = true;
+            ghostHouseCell.Connections[Left] = ghostHouseCell.Connections[Up] = ghostHouseCell.Connections[Right] = true;
 
-            Idx++;
-            G = Cells[Idx];
-            G.Filled = true; G.Connect[Up] = G.Connect[Lt] = true;
+            houseCellIndex++;
+            ghostHouseCell = Cells[houseCellIndex];
+            ghostHouseCell.Filled = true;
+            ghostHouseCell.Connections[Up] = ghostHouseCell.Connections[Left] = true;
 
-            for (int I = 0; I < CellCols; I++) TallRows[I] = CellRows;
-            for (int I = 0; I < CellRows; I++) NarrowCols[I] = CellCols;
+            for (int cellIndex = 0; cellIndex < CellColumnCount; cellIndex++)
+                TallRows[cellIndex] = CellRowCount;
+
+            for (int cellIndex = 0; cellIndex < CellRowCount; cellIndex++)
+                NarrowColumns[cellIndex] = CellColumnCount;
         }
 
         private List<Cell> GetLeftMostEmpty()
         {
-            var R = new List<Cell>();
-            for (int X = 0; X < CellCols; X++)
+            var emptyCells = new List<Cell>();
+
+            for (int column = 0; column < CellColumnCount; column++)
             {
-                for (int Y = 0; Y < CellRows; Y++)
+                for (int row = 0; row < CellRowCount; row++)
                 {
-                    var C = Cells[X + Y * CellCols];
-                    if (!C.Filled) R.Add(C);
+                    var cell = Cells[column + row * CellColumnCount];
+                    if (!cell.Filled) emptyCells.Add(cell);
                 }
-                if (R.Count > 0) break;
+
+                if (emptyCells.Count > 0) break;
             }
-            return R;
+
+            return emptyCells;
         }
 
-        private bool IsOpenCell(Cell C, int Dir, int PrevDir = -1, int Size = -1)
+        private bool IsOpenCell(Cell cell, int direction, int previousDirection = -1, int pieceSize = -1)
         {
-            if (C.Y == 6 && C.X == 0 && Dir == Dn) return false;
-            if (C.Y == 7 && C.X == 0 && Dir == Up) return false;
-            if (Size == 2 && (Dir == PrevDir || (Dir + 2) % 4 == PrevDir)) return false;
-            var Adj = C.Next[Dir];
-            if (Adj != null && !Adj.Filled)
+            if (cell.Row == 6 && cell.Column == 0 && direction == Down) return false;
+            if (cell.Row == 7 && cell.Column == 0 && direction == Up) return false;
+            if (pieceSize == 2 && (direction == previousDirection || (direction + 2) % 4 == previousDirection)) return false;
+
+            var adjacentCell = cell.Neighbors[direction];
+
+            if (adjacentCell != null && !adjacentCell.Filled)
             {
-                if (Adj.Next[Lt] != null && !Adj.Next[Lt].Filled) return false;
+                if (adjacentCell.Neighbors[Left] != null && !adjacentCell.Neighbors[Left].Filled) return false;
+
                 return true;
             }
+
             return false;
         }
 
-        private List<int> GetOpenDirs(Cell C, int PrevDir, int Size)
+        private List<int> GetOpenDirections(Cell cell, int previousDirection, int pieceSize)
         {
-            var R = new List<int>();
-            for (int I = 0; I < 4; I++)
-                if (IsOpenCell(C, I, PrevDir, Size)) R.Add(I);
-            return R;
+            var openDirections = new List<int>();
+
+            for (int direction = 0; direction < 4; direction++)
+                if (IsOpenCell(cell, direction, previousDirection, pieceSize)) openDirections.Add(direction);
+
+            return openDirections;
         }
 
-        private void ConnectCell(Cell C, int Dir)
+        private void ConnectCell(Cell cell, int direction)
         {
-            C.Connect[Dir] = true;
-            C.Next[Dir].Connect[(Dir + 2) % 4] = true;
-            if (C.X == 0 && Dir == Rt) C.Connect[Lt] = true;
+            cell.Connections[direction] = true;
+            cell.Neighbors[direction].Connections[(direction + 2) % 4] = true;
+            if (cell.Column == 0 && direction == Right) cell.Connections[Left] = true;
         }
 
-        private void FillCell(Cell C, ref int NumFilled, int Group)
+        private void FillCell(Cell cell, int groupIndex)
         {
-            C.Filled = true;
-            C.No = NumFilled++;
-            C.Group = Group;
+            cell.Filled = true;
+            cell.GroupIndex = groupIndex;
         }
 
-        private static double StopProb(int Size) => Size switch
+        private static double StopProbability(int pieceSize) => pieceSize switch
         {
-            <= 1 => 0, 2 => 0.10, 3 => 0.5, 4 => 0.75, _ => 1
+            <= 1 => 0,
+            2 => 0.10,
+            3 => 0.5,
+            4 => 0.75,
+            _ => 1
         };
 
-        private void Gen()
+        private void GeneratePieces()
         {
-            int NumFilled = 0;
-            int NumGroups = 0;
-            var SingleCount = new Dictionary<int, int> { { 0, 0 }, { CellRows - 1, 0 } };
-            int LongPieces = 0;
+            int groupCount = 0;
+            var singleCellCounts = new Dictionary<int, int> { { 0, 0 }, { CellRowCount - 1, 0 } };
+            int longPieceCount = 0;
 
             while (true)
             {
-                var LeftCells = GetLeftMostEmpty();
-                if (LeftCells.Count == 0) break;
+                var leftmostEmptyCells = GetLeftMostEmpty();
+                if (leftmostEmptyCells.Count == 0) break;
 
-                var FirstCell = LeftCells[Rng.Next(LeftCells.Count)];
-                var Cur = FirstCell;
-                FillCell(Cur, ref NumFilled, NumGroups);
+                var firstCell = leftmostEmptyCells[RandomGenerator.Next(leftmostEmptyCells.Count)];
+                var currentCell = firstCell;
+                FillCell(currentCell, groupCount);
 
                 // Single cell at top/bottom boundary
-                if (Cur.X < CellCols - 1 && SingleCount.ContainsKey(Cur.Y) && Rng.NextDouble() <= 0.35)
+                if (currentCell.Column < CellColumnCount - 1 && singleCellCounts.ContainsKey(currentCell.Row) && RandomGenerator.NextDouble() <= 0.35)
                 {
-                    if (SingleCount[Cur.Y] == 0)
+                    if (singleCellCounts[currentCell.Row] == 0)
                     {
-                        Cur.Connect[Cur.Y == 0 ? Up : Dn] = true;
-                        SingleCount[Cur.Y]++;
-                        NumGroups++;
+                        currentCell.Connections[currentCell.Row == 0 ? Up : Down] = true;
+                        singleCellCounts[currentCell.Row]++;
+                        groupCount++;
                         continue;
                     }
                 }
 
-                int Size = 1;
+                int pieceSize = 1;
 
-                if (Cur.X == CellCols - 1)
+                if (currentCell.Column == CellColumnCount - 1)
                 {
-                    Cur.Connect[Rt] = true;
-                    Cur.IsRaiseHeightCandidate = true;
+                    currentCell.Connections[Right] = true;
+                    currentCell.IsRaiseHeightCandidate = true;
                 }
                 else
                 {
-                    Cell NewCell = null;
-                    int Dir = -1;
+                    Cell newCell = null;
+                    int direction = -1;
 
-                    while (Size < 5)
+                    while (pieceSize < 5)
                     {
-                        bool Stop = false;
+                        bool shouldStop = false;
 
                         // At size 2: try L-piece
-                        if (Size == 2)
+                        if (pieceSize == 2)
                         {
-                            var C = FirstCell;
-                            if (C.X > 0 && C.Connect[Rt] && C.Next[Rt]?.Next[Rt] != null)
-                            {
-                                if (LongPieces < 1 && Rng.NextDouble() <= 1.0)
-                                {
-                                    C = C.Next[Rt].Next[Rt];
-                                    bool CanU = IsOpenCell(C, Up);
-                                    bool CanD = IsOpenCell(C, Dn);
-                                    int LD = -1;
-                                    if (CanU && CanD) LD = Rng.Next(2) == 0 ? Up : Dn;
-                                    else if (CanU) LD = Up;
-                                    else if (CanD) LD = Dn;
+                            var cell = firstCell;
 
-                                    if (LD >= 0)
+                            if (cell.Column > 0 && cell.Connections[Right] && cell.Neighbors[Right]?.Neighbors[Right] != null)
+                            {
+                                if (longPieceCount < 1 && RandomGenerator.NextDouble() <= 1.0)
+                                {
+                                    cell = cell.Neighbors[Right].Neighbors[Right];
+                                    bool canExtendUp = IsOpenCell(cell, Up);
+                                    bool canExtendDown = IsOpenCell(cell, Down);
+                                    int extensionDirection = -1;
+                                    if (canExtendUp && canExtendDown) extensionDirection = RandomGenerator.Next(2) == 0 ? Up : Down;
+                                    else if (canExtendUp) extensionDirection = Up;
+                                    else if (canExtendDown) extensionDirection = Down;
+
+                                    if (extensionDirection >= 0)
                                     {
-                                        ConnectCell(C, Lt);
-                                        FillCell(C, ref NumFilled, NumGroups);
-                                        ConnectCell(C, LD);
-                                        FillCell(C.Next[LD], ref NumFilled, NumGroups);
-                                        LongPieces++;
-                                        Size += 2;
-                                        Stop = true;
+                                        ConnectCell(cell, Left);
+                                        FillCell(cell, groupCount);
+                                        ConnectCell(cell, extensionDirection);
+                                        FillCell(cell.Neighbors[extensionDirection], groupCount);
+                                        longPieceCount++;
+                                        pieceSize += 2;
+                                        shouldStop = true;
                                     }
                                 }
                             }
                         }
 
-                        if (!Stop)
+                        if (!shouldStop)
                         {
-                            var Open = GetOpenDirs(Cur, Dir, Size);
-                            if (Open.Count == 0 && Size == 2)
+                            var openDirections = GetOpenDirections(currentCell, direction, pieceSize);
+
+                            if (openDirections.Count == 0 && pieceSize == 2)
                             {
-                                Cur = NewCell;
-                                Open = GetOpenDirs(Cur, Dir, Size);
+                                currentCell = newCell;
+                                openDirections = GetOpenDirections(currentCell, direction, pieceSize);
                             }
 
-                            if (Open.Count == 0)
+                            if (openDirections.Count == 0)
                             {
-                                Stop = true;
+                                shouldStop = true;
                             }
                             else
                             {
-                                Dir = Open[Rng.Next(Open.Count)];
-                                NewCell = Cur.Next[Dir];
-                                ConnectCell(Cur, Dir);
-                                FillCell(NewCell, ref NumFilled, NumGroups);
-                                Size++;
+                                direction = openDirections[RandomGenerator.Next(openDirections.Count)];
+                                newCell = currentCell.Neighbors[direction];
+                                ConnectCell(currentCell, direction);
+                                FillCell(newCell, groupCount);
+                                pieceSize++;
 
-                                if (FirstCell.X == 0 && Size == 3) Stop = true;
-                                if (!Stop && Rng.NextDouble() <= StopProb(Size)) Stop = true;
+                                if (firstCell.Column == 0 && pieceSize == 3) shouldStop = true;
+                                if (!shouldStop && RandomGenerator.NextDouble() <= StopProbability(pieceSize)) shouldStop = true;
                             }
                         }
 
-                        if (Stop)
+                        if (shouldStop)
                         {
-                            if (Size == 2)
+                            if (pieceSize == 2)
                             {
                                 // Attach vertical pair at right edge to wall
-                                var C = FirstCell;
-                                if (C.X == CellCols - 1)
+                                var cell = firstCell;
+
+                                if (cell.Column == CellColumnCount - 1)
                                 {
-                                    if (C.Connect[Up]) C = C.Next[Up];
-                                    C.Connect[Rt] = true;
-                                    C.Next[Dn].Connect[Rt] = true;
+                                    if (cell.Connections[Up]) cell = cell.Neighbors[Up];
+                                    cell.Connections[Right] = true;
+                                    cell.Neighbors[Down].Connections[Right] = true;
                                 }
                             }
-                            else if (Size == 3 || Size == 4)
+                            else if (pieceSize == 3 || pieceSize == 4)
                             {
                                 // Try long leg extension
-                                if (LongPieces < 1 && FirstCell.X > 0 && Rng.NextDouble() <= 0.5)
+                                if (longPieceCount < 1 && firstCell.Column > 0 && RandomGenerator.NextDouble() <= 0.5)
                                 {
-                                    var Dirs = new List<int>();
-                                    for (int I = 0; I < 4; I++)
-                                        if (Cur.Connect[I] && IsOpenCell(Cur.Next[I], I))
-                                            Dirs.Add(I);
-                                    if (Dirs.Count > 0)
+                                    var extensionDirections = new List<int>();
+
+                                    for (int candidateDirection = 0; candidateDirection < 4; candidateDirection++)
+                                        if (currentCell.Connections[candidateDirection] && IsOpenCell(currentCell.Neighbors[candidateDirection], candidateDirection))
+                                            extensionDirections.Add(candidateDirection);
+
+                                    if (extensionDirections.Count > 0)
                                     {
-                                        int ED = Dirs[Rng.Next(Dirs.Count)];
-                                        var EC = Cur.Next[ED];
-                                        ConnectCell(EC, ED);
-                                        FillCell(EC.Next[ED], ref NumFilled, NumGroups);
-                                        LongPieces++;
+                                        int extensionDirection = extensionDirections[RandomGenerator.Next(extensionDirections.Count)];
+                                        var extensionCell = currentCell.Neighbors[extensionDirection];
+                                        ConnectCell(extensionCell, extensionDirection);
+                                        FillCell(extensionCell.Neighbors[extensionDirection], groupCount);
+                                        longPieceCount++;
                                     }
                                 }
                             }
+
                             break;
                         }
                     }
                 }
-                NumGroups++;
+
+                groupCount++;
             }
+
             SetResizeCandidates();
         }
 
         private void SetResizeCandidates()
         {
-            for (int I = 0; I < CellRows * CellCols; I++)
+            for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
             {
-                var C = Cells[I];
-                var Q = C.Connect;
+                var cell = Cells[cellIndex];
+                var connections = cell.Connections;
 
-                if ((C.X == 0 || !Q[Lt]) && (C.X == CellCols - 1 || !Q[Rt]) && Q[Up] != Q[Dn])
-                    C.IsRaiseHeightCandidate = true;
+                if ((cell.Column == 0 || !connections[Left]) && (cell.Column == CellColumnCount - 1 || !connections[Right]) && connections[Up] != connections[Down])
+                    cell.IsRaiseHeightCandidate = true;
 
-                var C2 = C.Next[Rt];
-                if (C2 != null)
+                var rightCell = cell.Neighbors[Right];
+
+                if (rightCell != null)
                 {
-                    var Q2 = C2.Connect;
-                    if ((C.X == 0 || !Q[Lt]) && !Q[Up] && !Q[Dn] &&
-                        (C2.X == CellCols - 1 || !Q2[Rt]) && !Q2[Up] && !Q2[Dn])
-                        C.IsRaiseHeightCandidate = C2.IsRaiseHeightCandidate = true;
+                    var rightConnections = rightCell.Connections;
+                    if ((cell.Column == 0 || !connections[Left]) && !connections[Up] && !connections[Down] &&
+                        (rightCell.Column == CellColumnCount - 1 || !rightConnections[Right]) && !rightConnections[Up] && !rightConnections[Down])
+                        cell.IsRaiseHeightCandidate = rightCell.IsRaiseHeightCandidate = true;
                 }
 
-                if (C.X == CellCols - 1 && Q[Rt])
-                    C.IsShrinkWidthCandidate = true;
+                if (cell.Column == CellColumnCount - 1 && connections[Right])
+                    cell.IsShrinkWidthCandidate = true;
 
-                if ((C.Y == 0 || !Q[Up]) && (C.Y == CellRows - 1 || !Q[Dn]) && Q[Lt] != Q[Rt])
-                    C.IsShrinkWidthCandidate = true;
+                if ((cell.Row == 0 || !connections[Up]) && (cell.Row == CellRowCount - 1 || !connections[Down]) && connections[Left] != connections[Right])
+                    cell.IsShrinkWidthCandidate = true;
             }
         }
 
-        private static bool IsCross(Cell C) =>
-            C.Connect[Up] && C.Connect[Rt] && C.Connect[Dn] && C.Connect[Lt];
+        private static bool IsCross(Cell cell) =>
+            cell.Connections[Up] && cell.Connections[Right] && cell.Connections[Down] && cell.Connections[Left];
 
-        private bool IsHori(int X, int Y)
+        private bool IsHorizontalPiece(int column, int row)
         {
-            var Q1 = Cells[X + Y * CellCols].Connect;
-            var Q2 = Cells[X + 1 + Y * CellCols].Connect;
-            return !Q1[Up] && !Q1[Dn] && (X == 0 || !Q1[Lt]) && Q1[Rt] &&
-                   !Q2[Up] && !Q2[Dn] && Q2[Lt] && !Q2[Rt];
+            var firstConnections = Cells[column + row * CellColumnCount].Connections;
+            var neighborConnections = Cells[column + 1 + row * CellColumnCount].Connections;
+            return !firstConnections[Up] && !firstConnections[Down] && (column == 0 || !firstConnections[Left]) && firstConnections[Right] &&
+                   !neighborConnections[Up] && !neighborConnections[Down] && neighborConnections[Left] && !neighborConnections[Right];
         }
 
-        private bool IsVert(int X, int Y)
+        private bool IsVerticalPiece(int column, int row)
         {
-            var Q1 = Cells[X + Y * CellCols].Connect;
-            var Q2 = Cells[X + (Y + 1) * CellCols].Connect;
-            if (X == CellCols - 1)
-                return !Q1[Lt] && !Q1[Up] && !Q1[Dn] && !Q2[Lt] && !Q2[Up] && !Q2[Dn];
-            return !Q1[Lt] && !Q1[Rt] && !Q1[Up] && Q1[Dn] &&
-                   !Q2[Lt] && !Q2[Rt] && Q2[Up] && !Q2[Dn];
+            var firstConnections = Cells[column + row * CellColumnCount].Connections;
+            var neighborConnections = Cells[column + (row + 1) * CellColumnCount].Connections;
+            if (column == CellColumnCount - 1)
+                return !firstConnections[Left] && !firstConnections[Up] && !firstConnections[Down] && !neighborConnections[Left] && !neighborConnections[Up] && !neighborConnections[Down];
+
+            return !firstConnections[Left] && !firstConnections[Right] && !firstConnections[Up] && firstConnections[Down] &&
+                   !neighborConnections[Left] && !neighborConnections[Right] && neighborConnections[Up] && !neighborConnections[Down];
         }
 
         private bool IsDesirable()
         {
             // Solid corners
-            if (Cells[4].Connect[Up] || Cells[4].Connect[Rt]) return false;
-            if (Cells[CellRows * CellCols - 1].Connect[Dn] || Cells[CellRows * CellCols - 1].Connect[Rt]) return false;
+            if (Cells[4].Connections[Up] || Cells[4].Connections[Right]) return false;
+            if (Cells[CellRowCount * CellColumnCount - 1].Connections[Down] || Cells[CellRowCount * CellColumnCount - 1].Connections[Right]) return false;
 
             // Fix stacked 2-cell pieces
-            for (int Y = 0; Y < CellRows - 1; Y++)
+            for (int row = 0; row < CellRowCount - 1; row++)
             {
-                for (int X = 0; X < CellCols - 1; X++)
+                for (int column = 0; column < CellColumnCount - 1; column++)
                 {
-                    if ((IsHori(X, Y) && IsHori(X, Y + 1)) || (IsVert(X, Y) && IsVert(X + 1, Y)))
+                    if ((IsHorizontalPiece(column, row) && IsHorizontalPiece(column, row + 1)) || (IsVerticalPiece(column, row) && IsVerticalPiece(column + 1, row)))
                     {
-                        if (X == 0) return false;
-                        int G = Cells[X + Y * CellCols].Group;
-                        Cells[X + Y * CellCols].Connect[Dn] = Cells[X + Y * CellCols].Connect[Rt] = true;
-                        Cells[X + Y * CellCols].Group = G;
-                        Cells[X + 1 + Y * CellCols].Connect[Dn] = Cells[X + 1 + Y * CellCols].Connect[Lt] = true;
-                        Cells[X + 1 + Y * CellCols].Group = G;
-                        Cells[X + (Y + 1) * CellCols].Connect[Up] = Cells[X + (Y + 1) * CellCols].Connect[Rt] = true;
-                        Cells[X + (Y + 1) * CellCols].Group = G;
-                        Cells[X + 1 + (Y + 1) * CellCols].Connect[Up] = Cells[X + 1 + (Y + 1) * CellCols].Connect[Lt] = true;
-                        Cells[X + 1 + (Y + 1) * CellCols].Group = G;
+                        if (column == 0) return false;
+
+                        int groupIndex = Cells[column + row * CellColumnCount].GroupIndex;
+                        Cells[column + row * CellColumnCount].Connections[Down] = Cells[column + row * CellColumnCount].Connections[Right] = true;
+                        Cells[column + row * CellColumnCount].GroupIndex = groupIndex;
+                        Cells[column + 1 + row * CellColumnCount].Connections[Down] = Cells[column + 1 + row * CellColumnCount].Connections[Left] = true;
+                        Cells[column + 1 + row * CellColumnCount].GroupIndex = groupIndex;
+                        Cells[column + (row + 1) * CellColumnCount].Connections[Up] = Cells[column + (row + 1) * CellColumnCount].Connections[Right] = true;
+                        Cells[column + (row + 1) * CellColumnCount].GroupIndex = groupIndex;
+                        Cells[column + 1 + (row + 1) * CellColumnCount].Connections[Up] = Cells[column + 1 + (row + 1) * CellColumnCount].Connections[Left] = true;
+                        Cells[column + 1 + (row + 1) * CellColumnCount].GroupIndex = groupIndex;
                     }
                 }
             }
 
             if (!ChooseTallRows()) return false;
-            if (!ChooseNarrowCols()) return false;
+            if (!ChooseNarrowColumns()) return false;
+
             return true;
         }
 
         private bool ChooseTallRows()
         {
-            for (int Y = 0; Y < 3; Y++)
+            for (int row = 0; row < 3; row++)
             {
-                var C = Cells[Y * CellCols];
-                if (C.IsRaiseHeightCandidate && CanRaiseHeight(0, Y))
+                var cell = Cells[row * CellColumnCount];
+
+                if (cell.IsRaiseHeightCandidate && CanRaiseHeight(0, row))
                 {
-                    C.RaiseHeight = true;
-                    TallRows[C.X] = C.Y;
+                    cell.RaiseHeight = true;
+                    TallRows[cell.Column] = cell.Row;
                     return true;
                 }
             }
+
             return false;
         }
 
-        private bool CanRaiseHeight(int X, int Y)
+        private bool CanRaiseHeight(int column, int row)
         {
-            if (X == CellCols - 1) return true;
+            if (column == CellColumnCount - 1) return true;
 
-            Cell C = null, C2 = null;
-            for (int Y0 = Y; Y0 >= 0; Y0--)
+            Cell rightCell = null;
+
+            for (int scanRow = row; scanRow >= 0; scanRow--)
             {
-                C = Cells[X + Y0 * CellCols];
-                C2 = C.Next[Rt];
-                if ((!C.Connect[Up] || IsCross(C)) && (!C2.Connect[Up] || IsCross(C2)))
+                var cell = Cells[column + scanRow * CellColumnCount];
+                rightCell = cell.Neighbors[Right];
+                if ((!cell.Connections[Up] || IsCross(cell)) && (!rightCell.Connections[Up] || IsCross(rightCell)))
                     break;
             }
 
-            var Cands = new List<Cell>();
-            for (; C2 != null; C2 = C2.Next[Dn])
+            var candidates = new List<Cell>();
+
+            for (; rightCell != null; rightCell = rightCell.Neighbors[Down])
             {
-                if (C2.IsRaiseHeightCandidate) Cands.Add(C2);
-                if ((!C2.Connect[Dn] || IsCross(C2)) &&
-                    C2.Next[Lt] != null && (!C2.Next[Lt].Connect[Dn] || IsCross(C2.Next[Lt])))
+                if (rightCell.IsRaiseHeightCandidate) candidates.Add(rightCell);
+                if ((!rightCell.Connections[Down] || IsCross(rightCell)) &&
+                    rightCell.Neighbors[Left] != null && (!rightCell.Neighbors[Left].Connections[Down] || IsCross(rightCell.Neighbors[Left])))
                     break;
             }
 
-            Shuffle(Cands);
-            foreach (var Cd in Cands)
+            Shuffle(candidates);
+
+            foreach (var candidate in candidates)
             {
-                if (CanRaiseHeight(Cd.X, Cd.Y))
+                if (CanRaiseHeight(candidate.Column, candidate.Row))
                 {
-                    Cd.RaiseHeight = true;
-                    TallRows[Cd.X] = Cd.Y;
+                    candidate.RaiseHeight = true;
+                    TallRows[candidate.Column] = candidate.Row;
                     return true;
                 }
             }
+
             return false;
         }
 
-        private bool ChooseNarrowCols()
+        private bool ChooseNarrowColumns()
         {
-            for (int X = CellCols - 1; X >= 0; X--)
+            for (int column = CellColumnCount - 1; column >= 0; column--)
             {
-                var C = Cells[X];
-                if (C.IsShrinkWidthCandidate && CanShrinkWidth(X, 0))
+                var cell = Cells[column];
+
+                if (cell.IsShrinkWidthCandidate && CanShrinkWidth(column, 0))
                 {
-                    C.ShrinkWidth = true;
-                    NarrowCols[C.Y] = C.X;
+                    cell.ShrinkWidth = true;
+                    NarrowColumns[cell.Row] = cell.Column;
                     return true;
                 }
             }
+
             return false;
         }
 
-        private bool CanShrinkWidth(int X, int Y)
+        private bool CanShrinkWidth(int column, int row)
         {
-            if (Y == CellRows - 1) return true;
+            if (row == CellRowCount - 1) return true;
 
-            Cell C = null, C2 = null;
-            for (int X0 = X; X0 < CellCols; X0++)
+            Cell lowerCell = null;
+
+            for (int scanColumn = column; scanColumn < CellColumnCount; scanColumn++)
             {
-                C = Cells[X0 + Y * CellCols];
-                C2 = C.Next[Dn];
-                if ((!C.Connect[Rt] || IsCross(C)) && (!C2.Connect[Rt] || IsCross(C2)))
+                var cell = Cells[scanColumn + row * CellColumnCount];
+                lowerCell = cell.Neighbors[Down];
+                if ((!cell.Connections[Right] || IsCross(cell)) && (!lowerCell.Connections[Right] || IsCross(lowerCell)))
                     break;
             }
 
-            var Cands = new List<Cell>();
-            for (; C2 != null; C2 = C2.Next[Lt])
+            var candidates = new List<Cell>();
+
+            for (; lowerCell != null; lowerCell = lowerCell.Neighbors[Left])
             {
-                if (C2.IsShrinkWidthCandidate) Cands.Add(C2);
-                if ((!C2.Connect[Lt] || IsCross(C2)) &&
-                    C2.Next[Up] != null && (!C2.Next[Up].Connect[Lt] || IsCross(C2.Next[Up])))
+                if (lowerCell.IsShrinkWidthCandidate) candidates.Add(lowerCell);
+                if ((!lowerCell.Connections[Left] || IsCross(lowerCell)) &&
+                    lowerCell.Neighbors[Up] != null && (!lowerCell.Neighbors[Up].Connections[Left] || IsCross(lowerCell.Neighbors[Up])))
                     break;
             }
 
-            Shuffle(Cands);
-            foreach (var Cd in Cands)
+            Shuffle(candidates);
+
+            foreach (var candidate in candidates)
             {
-                if (CanShrinkWidth(Cd.X, Cd.Y))
+                if (CanShrinkWidth(candidate.Column, candidate.Row))
                 {
-                    Cd.ShrinkWidth = true;
-                    NarrowCols[Cd.Y] = Cd.X;
+                    candidate.ShrinkWidth = true;
+                    NarrowColumns[candidate.Row] = candidate.Column;
                     return true;
                 }
             }
+
             return false;
         }
 
-        private void SetUpScaleCoords()
+        private void SetUpScaledCoordinates()
         {
-            for (int I = 0; I < CellRows * CellCols; I++)
+            for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
             {
-                var C = Cells[I];
-                C.FinalX = C.X * 3 - (NarrowCols[C.Y] < C.X ? 1 : 0);
-                C.FinalY = C.Y * 3 + (TallRows[C.X] < C.Y ? 1 : 0);
-                C.FinalW = C.ShrinkWidth ? 2 : 3;
-                C.FinalH = C.RaiseHeight ? 4 : 3;
+                var cell = Cells[cellIndex];
+                cell.FinalColumn = cell.Column * 3 - (NarrowColumns[cell.Row] < cell.Column ? 1 : 0);
+                cell.FinalRow = cell.Row * 3 + (TallRows[cell.Column] < cell.Row ? 1 : 0);
+                cell.FinalWidth = cell.ShrinkWidth ? 2 : 3;
+                cell.FinalHeight = cell.RaiseHeight ? 4 : 3;
             }
         }
 
         private void JoinWalls()
         {
             // Join to top boundary
-            for (int X = 0; X < CellCols; X++)
+            for (int column = 0; column < CellColumnCount; column++)
             {
-                var C = Cells[X];
-                if (!C.Connect[Lt] && !C.Connect[Rt] && !C.Connect[Up] &&
-                    (!C.Connect[Dn] || !C.Next[Dn].Connect[Dn]))
+                var cell = Cells[column];
+
+                if (!cell.Connections[Left] && !cell.Connections[Right] && !cell.Connections[Up] &&
+                    (!cell.Connections[Down] || !cell.Neighbors[Down].Connections[Down]))
                 {
-                    if ((C.Next[Lt] == null || !C.Next[Lt].Connect[Up]) &&
-                        C.Next[Rt] != null && !C.Next[Rt].Connect[Up])
+                    if ((cell.Neighbors[Left] == null || !cell.Neighbors[Left].Connections[Up]) &&
+                        cell.Neighbors[Right] != null && !cell.Neighbors[Right].Connections[Up])
                     {
-                        if (!(C.Next[Dn] != null && C.Next[Dn].Connect[Rt] &&
-                              C.Next[Dn].Next[Rt] != null && C.Next[Dn].Next[Rt].Connect[Rt]))
+                        if (!(cell.Neighbors[Down] != null && cell.Neighbors[Down].Connections[Right] &&
+                              cell.Neighbors[Down].Neighbors[Right] != null && cell.Neighbors[Down].Neighbors[Right].Connections[Right]))
                         {
-                            C.IsJoinCandidate = true;
-                            if (Rng.NextDouble() <= 0.25) C.Connect[Up] = true;
+                            if (RandomGenerator.NextDouble() <= 0.25) cell.Connections[Up] = true;
                         }
                     }
                 }
             }
 
             // Join to bottom boundary
-            for (int X = 0; X < CellCols; X++)
+            for (int column = 0; column < CellColumnCount; column++)
             {
-                var C = Cells[X + (CellRows - 1) * CellCols];
-                if (!C.Connect[Lt] && !C.Connect[Rt] && !C.Connect[Dn] &&
-                    (!C.Connect[Up] || !C.Next[Up].Connect[Up]))
+                var cell = Cells[column + (CellRowCount - 1) * CellColumnCount];
+
+                if (!cell.Connections[Left] && !cell.Connections[Right] && !cell.Connections[Down] &&
+                    (!cell.Connections[Up] || !cell.Neighbors[Up].Connections[Up]))
                 {
-                    if ((C.Next[Lt] == null || !C.Next[Lt].Connect[Dn]) &&
-                        C.Next[Rt] != null && !C.Next[Rt].Connect[Dn])
+                    if ((cell.Neighbors[Left] == null || !cell.Neighbors[Left].Connections[Down]) &&
+                        cell.Neighbors[Right] != null && !cell.Neighbors[Right].Connections[Down])
                     {
-                        if (!(C.Next[Up] != null && C.Next[Up].Connect[Rt] &&
-                              C.Next[Up].Next[Rt] != null && C.Next[Up].Next[Rt].Connect[Rt]))
+                        if (!(cell.Neighbors[Up] != null && cell.Neighbors[Up].Connections[Right] &&
+                              cell.Neighbors[Up].Neighbors[Right] != null && cell.Neighbors[Up].Neighbors[Right].Connections[Right]))
                         {
-                            C.IsJoinCandidate = true;
-                            if (Rng.NextDouble() <= 0.25) C.Connect[Dn] = true;
+                            if (RandomGenerator.NextDouble() <= 0.25) cell.Connections[Down] = true;
                         }
                     }
                 }
             }
 
             // Join to right boundary
-            for (int Y = 1; Y < CellRows - 1; Y++)
+            for (int row = 1; row < CellRowCount - 1; row++)
             {
-                var C = Cells[CellCols - 1 + Y * CellCols];
-                if (C.RaiseHeight) continue;
-                if (!C.Connect[Rt] && !C.Connect[Up] && !C.Connect[Dn] &&
-                    !C.Next[Up].Connect[Rt] && !C.Next[Dn].Connect[Rt])
+                var cell = Cells[CellColumnCount - 1 + row * CellColumnCount];
+                if (cell.RaiseHeight) continue;
+
+                if (!cell.Connections[Right] && !cell.Connections[Up] && !cell.Connections[Down] &&
+                    !cell.Neighbors[Up].Connections[Right] && !cell.Neighbors[Down].Connections[Right])
                 {
-                    if (C.Connect[Lt])
+                    if (cell.Connections[Left])
                     {
-                        var C2 = C.Next[Lt];
-                        if (!C2.Connect[Up] && !C2.Connect[Dn] && !C2.Connect[Lt])
+                        var leftCell = cell.Neighbors[Left];
+
+                        if (!leftCell.Connections[Up] && !leftCell.Connections[Down] && !leftCell.Connections[Left])
                         {
-                            C.IsJoinCandidate = true;
-                            if (Rng.NextDouble() <= 0.5) C.Connect[Rt] = true;
+                            if (RandomGenerator.NextDouble() <= 0.5) cell.Connections[Right] = true;
                         }
                     }
                 }
@@ -578,66 +619,63 @@ public static class PacmanMazeGenerator
 
         private bool CreateTunnels()
         {
-            var SingleDead = new List<Cell>();
-            var TopSingleDead = new List<Cell>();
-            var BotSingleDead = new List<Cell>();
-            var VoidTunnel = new List<Cell>();
-            var TopVoid = new List<Cell>();
-            var BotVoid = new List<Cell>();
-            var EdgeTunnel = new List<Cell>();
-            var TopEdge = new List<Cell>();
-            var BotEdge = new List<Cell>();
-            var DoubleDead = new List<Cell>();
+            var singleDeadEnds = new List<Cell>();
+            var topSingleDeadEnds = new List<Cell>();
+            var bottomSingleDeadEnds = new List<Cell>();
+            var voidTunnels = new List<Cell>();
+            var topVoidTunnels = new List<Cell>();
+            var bottomVoidTunnels = new List<Cell>();
+            var edgeTunnels = new List<Cell>();
+            var topEdgeTunnels = new List<Cell>();
+            var bottomEdgeTunnels = new List<Cell>();
+            var doubleDeadEnds = new List<Cell>();
 
-            for (int Y = 0; Y < CellRows; Y++)
+            for (int row = 0; row < CellRowCount; row++)
             {
-                var C = Cells[CellCols - 1 + Y * CellCols];
-                if (C.Connect[Up]) continue;
+                var cell = Cells[CellColumnCount - 1 + row * CellColumnCount];
+                if (cell.Connections[Up]) continue;
 
-                if (C.Y > 1 && C.Y < CellRows - 2)
+                if (cell.Row > 1 && cell.Row < CellRowCount - 2)
                 {
-                    C.IsEdgeTunnelCandidate = true;
-                    EdgeTunnel.Add(C);
-                    if (C.Y <= 2) TopEdge.Add(C);
-                    else if (C.Y >= 5) BotEdge.Add(C);
+                    edgeTunnels.Add(cell);
+                    if (cell.Row <= 2) topEdgeTunnels.Add(cell);
+                    else if (cell.Row >= 5) bottomEdgeTunnels.Add(cell);
                 }
 
-                bool UpDead = C.Next[Up] == null || C.Next[Up].Connect[Rt];
-                bool DnDead = C.Next[Dn] == null || C.Next[Dn].Connect[Rt];
+                bool upBlocked = cell.Neighbors[Up] == null || cell.Neighbors[Up].Connections[Right];
+                bool downBlocked = cell.Neighbors[Down] == null || cell.Neighbors[Down].Connections[Right];
 
-                if (C.Connect[Rt])
+                if (cell.Connections[Right])
                 {
-                    if (UpDead)
+                    if (upBlocked)
                     {
-                        C.IsVoidTunnelCandidate = true;
-                        VoidTunnel.Add(C);
-                        if (C.Y <= 2) TopVoid.Add(C);
-                        else if (C.Y >= 6) BotVoid.Add(C);
+                        voidTunnels.Add(cell);
+                        if (cell.Row <= 2) topVoidTunnels.Add(cell);
+                        else if (cell.Row >= 6) bottomVoidTunnels.Add(cell);
                     }
                 }
                 else
                 {
-                    if (C.Connect[Dn]) continue;
-                    if (UpDead != DnDead)
+                    if (cell.Connections[Down]) continue;
+
+                    if (upBlocked != downBlocked)
                     {
-                        if (!C.RaiseHeight && Y < CellRows - 1 && C.Next[Lt] != null && !C.Next[Lt].Connect[Lt])
+                        if (!cell.RaiseHeight && row < CellRowCount - 1 && cell.Neighbors[Left] != null && !cell.Neighbors[Left].Connections[Left])
                         {
-                            SingleDead.Add(C);
-                            C.IsSingleDeadEndCandidate = true;
-                            C.SingleDeadEndDir = UpDead ? Up : Dn;
-                            int Off = UpDead ? 1 : 0;
-                            if (C.Y <= 1 + Off) TopSingleDead.Add(C);
-                            else if (C.Y >= 5 + Off) BotSingleDead.Add(C);
+                            singleDeadEnds.Add(cell);
+                            cell.SingleDeadEndDirection = upBlocked ? Up : Down;
+                            int rowOffset = upBlocked ? 1 : 0;
+                            if (cell.Row <= 1 + rowOffset) topSingleDeadEnds.Add(cell);
+                            else if (cell.Row >= 5 + rowOffset) bottomSingleDeadEnds.Add(cell);
                         }
                     }
-                    else if (UpDead && DnDead)
+                    else if (upBlocked && downBlocked)
                     {
-                        if (Y > 0 && Y < CellRows - 1 && C.Next[Lt] != null)
+                        if (row > 0 && row < CellRowCount - 1 && cell.Neighbors[Left] != null)
                         {
-                            if (C.Next[Lt].Connect[Up] && C.Next[Lt].Connect[Dn])
+                            if (cell.Neighbors[Left].Connections[Up] && cell.Neighbors[Left].Connections[Down])
                             {
-                                C.IsDoubleDeadEndCandidate = true;
-                                if (C.Y >= 2 && C.Y <= 5) DoubleDead.Add(C);
+                                if (cell.Row >= 2 && cell.Row <= 5) doubleDeadEnds.Add(cell);
                             }
                         }
                     }
@@ -645,220 +683,246 @@ public static class PacmanMazeGenerator
             }
 
             // Choose tunnels
-            int Desired = Rng.NextDouble() <= 0.45 ? 2 : 1;
-            Cell Pick;
+            int desiredTunnelCount = RandomGenerator.NextDouble() <= 0.45 ? 2 : 1;
+            Cell selectedCell;
 
-            if (Desired == 1)
+            if (desiredTunnelCount == 1)
             {
-                if ((Pick = RandElement(VoidTunnel)) != null) Pick.TopTunnel = true;
-                else if ((Pick = RandElement(SingleDead)) != null) SelSingleDead(Pick);
-                else if ((Pick = RandElement(EdgeTunnel)) != null) Pick.TopTunnel = true;
+                if ((selectedCell = RandomElement(voidTunnels)) != null) selectedCell.TopTunnel = true;
+                else if ((selectedCell = RandomElement(singleDeadEnds)) != null) SelectSingleDeadEnd(selectedCell);
+                else if ((selectedCell = RandomElement(edgeTunnels)) != null) selectedCell.TopTunnel = true;
                 else return false;
             }
             else
             {
-                if ((Pick = RandElement(DoubleDead)) != null)
+                if ((selectedCell = RandomElement(doubleDeadEnds)) != null)
                 {
-                    Pick.Connect[Rt] = true;
-                    Pick.TopTunnel = true;
-                    Pick.Next[Dn].TopTunnel = true;
+                    selectedCell.Connections[Right] = true;
+                    selectedCell.TopTunnel = true;
+                    selectedCell.Neighbors[Down].TopTunnel = true;
                 }
                 else
                 {
-                    int Created = 1;
-                    if ((Pick = RandElement(TopVoid)) != null) Pick.TopTunnel = true;
-                    else if ((Pick = RandElement(TopSingleDead)) != null) SelSingleDead(Pick);
-                    else if ((Pick = RandElement(TopEdge)) != null) Pick.TopTunnel = true;
-                    else Created = 0;
+                    int createdTunnelCount = 1;
+                    if ((selectedCell = RandomElement(topVoidTunnels)) != null) selectedCell.TopTunnel = true;
+                    else if ((selectedCell = RandomElement(topSingleDeadEnds)) != null) SelectSingleDeadEnd(selectedCell);
+                    else if ((selectedCell = RandomElement(topEdgeTunnels)) != null) selectedCell.TopTunnel = true;
+                    else createdTunnelCount = 0;
 
-                    if ((Pick = RandElement(BotVoid)) != null) Pick.TopTunnel = true;
-                    else if ((Pick = RandElement(BotSingleDead)) != null) SelSingleDead(Pick);
-                    else if ((Pick = RandElement(BotEdge)) != null) Pick.TopTunnel = true;
-                    else if (Created == 0) return false;
+                    if ((selectedCell = RandomElement(bottomVoidTunnels)) != null) selectedCell.TopTunnel = true;
+                    else if ((selectedCell = RandomElement(bottomSingleDeadEnds)) != null) SelectSingleDeadEnd(selectedCell);
+                    else if ((selectedCell = RandomElement(bottomEdgeTunnels)) != null) selectedCell.TopTunnel = true;
+                    else if (createdTunnelCount == 0) return false;
                 }
             }
 
             // No straight-through horizontal path
-            for (int Y = 0; Y < CellRows; Y++)
+            for (int row = 0; row < CellRowCount; row++)
             {
-                var C = Cells[CellCols - 1 + Y * CellCols];
-                if (!C.TopTunnel) continue;
-                bool Straight = true;
-                int TopY = C.FinalY;
-                var W = C;
-                while (W.Next[Lt] != null)
+                var cell = Cells[CellColumnCount - 1 + row * CellColumnCount];
+                if (!cell.TopTunnel) continue;
+
+                bool isStraight = true;
+                int tunnelTop = cell.FinalRow;
+                var walkCell = cell;
+
+                while (walkCell.Neighbors[Left] != null)
                 {
-                    W = W.Next[Lt];
-                    if (!W.Connect[Up] && W.FinalY == TopY) continue;
-                    Straight = false;
+                    walkCell = walkCell.Neighbors[Left];
+                    if (!walkCell.Connections[Up] && walkCell.FinalRow == tunnelTop) continue;
+
+                    isStraight = false;
                     break;
                 }
-                if (Straight) return false;
+
+                if (isStraight) return false;
             }
 
             // Clear unused void tunnels
-            foreach (var Vc in VoidTunnel)
+            foreach (var voidCell in voidTunnels)
             {
-                if (!Vc.TopTunnel)
+                if (!voidCell.TopTunnel)
                 {
-                    ReplaceGroup(Vc.Group, Vc.Next[Up].Group);
-                    Vc.Connect[Up] = true;
-                    Vc.Next[Up].Connect[Dn] = true;
+                    ReplaceGroup(voidCell.GroupIndex, voidCell.Neighbors[Up].GroupIndex);
+                    voidCell.Connections[Up] = true;
+                    voidCell.Neighbors[Up].Connections[Down] = true;
                 }
             }
 
             return true;
         }
 
-        private void SelSingleDead(Cell C)
+        private void SelectSingleDeadEnd(Cell cell)
         {
-            C.Connect[Rt] = true;
-            if (C.SingleDeadEndDir == Up) C.TopTunnel = true;
-            else C.Next[Dn].TopTunnel = true;
+            cell.Connections[Right] = true;
+            if (cell.SingleDeadEndDirection == Up) cell.TopTunnel = true;
+            else cell.Neighbors[Down].TopTunnel = true;
         }
 
-        private void ReplaceGroup(int OldG, int NewG)
+        private void ReplaceGroup(int oldGroup, int newGroup)
         {
-            for (int I = 0; I < CellRows * CellCols; I++)
-                if (Cells[I].Group == OldG) Cells[I].Group = NewG;
+            for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
+                if (Cells[cellIndex].GroupIndex == oldGroup) Cells[cellIndex].GroupIndex = newGroup;
         }
 
         private string[] GetTiles()
         {
-            var Tiles = new char[SubRows * FullCols];
-            var TC = new Cell[SubRows * SubCols];
+            var tiles = new char[TileRowCount * FullColumnCount];
+            var tileCells = new Cell[TileRowCount * HalfTileColumnCount];
 
-            for (int I = 0; I < Tiles.Length; I++) Tiles[I] = '_';
+            for (int tileIndex = 0; tileIndex < tiles.Length; tileIndex++)
+                tiles[tileIndex] = '_';
 
-            void ST(int X, int Y, char V)
+            void SetMirroredTile(int column, int row, char tile)
             {
-                if (X < 0 || X > SubCols - 1 || Y < 0 || Y > SubRows - 1) return;
-                int A = X - 2;
-                int Ia = MidCols + A + Y * FullCols;
-                int Ib = MidCols - 1 - A + Y * FullCols;
-                if (Ia >= 0 && Ia < Tiles.Length) Tiles[Ia] = V;
-                if (Ib >= 0 && Ib < Tiles.Length) Tiles[Ib] = V;
+                if (column < 0 || column > HalfTileColumnCount - 1 || row < 0 || row > TileRowCount - 1) return;
+
+                int mirrorOffset = column - 2;
+                int rightTileIndex = MirrorColumn + mirrorOffset + row * FullColumnCount;
+                int leftTileIndex = MirrorColumn - 1 - mirrorOffset + row * FullColumnCount;
+                if (rightTileIndex >= 0 && rightTileIndex < tiles.Length) tiles[rightTileIndex] = tile;
+                if (leftTileIndex >= 0 && leftTileIndex < tiles.Length) tiles[leftTileIndex] = tile;
             }
 
-            char GT(int X, int Y)
+            char GetTile(int column, int row)
             {
-                if (X < 0 || X > SubCols - 1 || Y < 0 || Y > SubRows - 1) return '\0';
-                int Idx = MidCols + (X - 2) + Y * FullCols;
-                return (Idx >= 0 && Idx < Tiles.Length) ? Tiles[Idx] : '\0';
+                if (column < 0 || column > HalfTileColumnCount - 1 || row < 0 || row > TileRowCount - 1) return '\0';
+
+                int tileIndex = MirrorColumn + (column - 2) + row * FullColumnCount;
+                return (tileIndex >= 0 && tileIndex < tiles.Length) ? tiles[tileIndex] : '\0';
             }
 
-            void STC(int X, int Y, Cell C)
+            void SetTileCell(int column, int row, Cell cell)
             {
-                if (X < 0 || X > SubCols - 1 || Y < 0 || Y > SubRows - 1) return;
-                int Idx = X + Y * SubCols;
-                if (Idx >= 0 && Idx < TC.Length) TC[Idx] = C;
+                if (column < 0 || column > HalfTileColumnCount - 1 || row < 0 || row > TileRowCount - 1) return;
+
+                int cellIndex = column + row * HalfTileColumnCount;
+                if (cellIndex >= 0 && cellIndex < tileCells.Length) tileCells[cellIndex] = cell;
             }
 
-            Cell GTC(int X, int Y)
+            Cell GetTileCell(int column, int row)
             {
-                if (X < 0 || X > SubCols - 1 || Y < 0 || Y > SubRows - 1) return null;
-                int Idx = X + Y * SubCols;
-                return (Idx >= 0 && Idx < TC.Length) ? TC[Idx] : null;
+                if (column < 0 || column > HalfTileColumnCount - 1 || row < 0 || row > TileRowCount - 1) return null;
+
+                int cellIndex = column + row * HalfTileColumnCount;
+                return (cellIndex >= 0 && cellIndex < tileCells.Length) ? tileCells[cellIndex] : null;
             }
 
-            // Map cells to tile positions
-            for (int I = 0; I < CellRows * CellCols; I++)
+            // Build mirrored paths from the cell connections.
+            for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
             {
-                var C = Cells[I];
-                for (int X0 = 0; X0 < C.FinalW; X0++)
-                    for (int Y0 = 0; Y0 < C.FinalH; Y0++)
-                        STC(C.FinalX + X0, C.FinalY + 1 + Y0, C);
+                var cell = Cells[cellIndex];
+
+                for (int tileOffsetX = 0; tileOffsetX < cell.FinalWidth; tileOffsetX++)
+                    for (int tileOffsetY = 0; tileOffsetY < cell.FinalHeight; tileOffsetY++)
+                        SetTileCell(cell.FinalColumn + tileOffsetX, cell.FinalRow + 1 + tileOffsetY, cell);
             }
 
-            // Set path tiles
-            for (int Y = 0; Y < SubRows; Y++)
+            for (int row = 0; row < TileRowCount; row++)
             {
-                for (int X = 0; X < SubCols; X++)
+                for (int column = 0; column < HalfTileColumnCount; column++)
                 {
-                    var C = GTC(X, Y);
-                    var Cl = GTC(X - 1, Y);
-                    var Cu = GTC(X, Y - 1);
+                    var cell = GetTileCell(column, row);
+                    var leftCell = GetTileCell(column - 1, row);
+                    var upperCell = GetTileCell(column, row - 1);
 
-                    if (C != null)
+                    if (cell != null)
                     {
-                        if ((Cl != null && C.Group != Cl.Group) ||
-                            (Cu != null && C.Group != Cu.Group) ||
-                            (Cu == null && !C.Connect[Up]))
-                            ST(X, Y, '.');
+                        if ((leftCell != null && cell.GroupIndex != leftCell.GroupIndex) ||
+                            (upperCell != null && cell.GroupIndex != upperCell.GroupIndex) ||
+                            (upperCell == null && !cell.Connections[Up]))
+                            SetMirroredTile(column, row, '.');
                     }
                     else
                     {
-                        if ((Cl != null && (!Cl.Connect[Rt] || GT(X - 1, Y) == '.')) ||
-                            (Cu != null && (!Cu.Connect[Dn] || GT(X, Y - 1) == '.')))
-                            ST(X, Y, '.');
+                        if ((leftCell != null && (!leftCell.Connections[Right] || GetTile(column - 1, row) == '.')) ||
+                            (upperCell != null && (!upperCell.Connections[Down] || GetTile(column, row - 1) == '.')))
+                            SetMirroredTile(column, row, '.');
                     }
 
-                    if (GT(X - 1, Y) == '.' && GT(X, Y - 1) == '.' && GT(X - 1, Y - 1) == '_')
-                        ST(X, Y, '.');
+                    if (GetTile(column - 1, row) == '.' && GetTile(column, row - 1) == '.' && GetTile(column - 1, row - 1) == '_')
+                        SetMirroredTile(column, row, '.');
                 }
             }
 
-            // Extend tunnels
-            for (var C = Cells[CellCols - 1]; C != null; C = C.Next[Dn])
+            for (var cell = Cells[CellColumnCount - 1]; cell != null; cell = cell.Neighbors[Down])
             {
-                if (C.TopTunnel)
+                if (cell.TopTunnel)
                 {
-                    int Y = C.FinalY + 1;
-                    ST(SubCols - 1, Y, '.');
-                    ST(SubCols - 2, Y, '.');
+                    int row = cell.FinalRow + 1;
+                    SetMirroredTile(HalfTileColumnCount - 1, row, '.');
+                    SetMirroredTile(HalfTileColumnCount - 2, row, '.');
                 }
             }
 
-            // Fill in walls
-            for (int Y = 0; Y < SubRows; Y++)
+            for (int row = 0; row < TileRowCount; row++)
             {
-                for (int X = 0; X < SubCols; X++)
+                for (int column = 0; column < HalfTileColumnCount; column++)
                 {
-                    if (GT(X, Y) != '.' &&
-                        (GT(X - 1, Y) == '.' || GT(X, Y - 1) == '.' ||
-                         GT(X + 1, Y) == '.' || GT(X, Y + 1) == '.' ||
-                         GT(X - 1, Y - 1) == '.' || GT(X + 1, Y - 1) == '.' ||
-                         GT(X + 1, Y + 1) == '.' || GT(X - 1, Y + 1) == '.'))
-                        ST(X, Y, '|');
+                    if (GetTile(column, row) != '.' &&
+                        (GetTile(column - 1, row) == '.' || GetTile(column, row - 1) == '.' ||
+                         GetTile(column + 1, row) == '.' || GetTile(column, row + 1) == '.' ||
+                         GetTile(column - 1, row - 1) == '.' || GetTile(column + 1, row - 1) == '.' ||
+                         GetTile(column + 1, row + 1) == '.' || GetTile(column - 1, row + 1) == '.'))
+                        SetMirroredTile(column, row, '|');
                 }
             }
 
-            // Stamp ghost house (cols 9-18, rows 11-17) matching fallback layout
-            void Set(int X, int Y, char V) { Tiles[X + Y * FullCols] = V; }
+            // Keep the ghost house at columns 9–18 and rows 11–17, matching the fallback layout.
+            void SetTile(int column, int row, char tile) { tiles[column + row * FullColumnCount] = tile; }
 
-            // Row 11: corridor above
-            for (int X = 9; X <= 18; X++) Set(X, 11, '.');
-            // Row 12: top wall + door
-            Set(9, 12, '.'); Set(18, 12, '.');
-            for (int X = 10; X <= 12; X++) Set(X, 12, '|');
-            Set(13, 12, '.'); Set(14, 12, '.');
-            for (int X = 15; X <= 17; X++) Set(X, 12, '|');
-            // Rows 13-15: interior
-            for (int Y = 13; Y <= 15; Y++)
+            for (int column = 9; column <= 18; column++)
+                SetTile(column, 11, '.');
+
+            SetTile(9, 12, '.');
+            SetTile(18, 12, '.');
+
+            for (int column = 10; column <= 12; column++)
+                SetTile(column, 12, '|');
+
+            SetTile(13, 12, '.');
+            SetTile(14, 12, '.');
+
+            for (int column = 15; column <= 17; column++)
+                SetTile(column, 12, '|');
+
+            for (int row = 13; row <= 15; row++)
             {
-                Set(9, Y, '.'); Set(10, Y, '|');
-                for (int X = 11; X <= 16; X++) Set(X, Y, '.');
-                Set(17, Y, '|'); Set(18, Y, '.');
+                SetTile(9, row, '.');
+                SetTile(10, row, '|');
+
+                for (int column = 11; column <= 16; column++)
+                    SetTile(column, row, '.');
+
+                SetTile(17, row, '|');
+                SetTile(18, row, '.');
             }
-            // Row 16: bottom wall
-            Set(9, 16, '.'); Set(18, 16, '.');
-            for (int X = 10; X <= 17; X++) Set(X, 16, '|');
-            // Row 17: corridor below
-            for (int X = 9; X <= 18; X++) Set(X, 17, '.');
 
-            // Convert to output
-            var Layout = new string[SubRows];
-            for (int Y = 0; Y < SubRows; Y++)
+            SetTile(9, 16, '.');
+            SetTile(18, 16, '.');
+
+            for (int column = 10; column <= 17; column++)
+                SetTile(column, 16, '|');
+
+            for (int column = 9; column <= 18; column++)
+                SetTile(column, 17, '.');
+
+            var layout = new string[TileRowCount];
+
+            for (int row = 0; row < TileRowCount; row++)
             {
-                var Row = new char[FullCols];
-                for (int X = 0; X < FullCols; X++)
+                var rowTiles = new char[FullColumnCount];
+
+                for (int column = 0; column < FullColumnCount; column++)
                 {
-                    char T = Tiles[X + Y * FullCols];
-                    Row[X] = (T == '.') ? '0' : '1';
+                    char tile = tiles[column + row * FullColumnCount];
+                    rowTiles[column] = (tile == '.') ? '0' : '1';
                 }
-                Layout[Y] = new string(Row);
+
+                layout[row] = new string(rowTiles);
             }
-            return Layout;
+
+            return layout;
         }
     }
 
