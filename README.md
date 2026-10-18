@@ -33,15 +33,6 @@
 | **Live controls** | Switch levels, restart, pause, and tune rendering from the runtime inspector. |
 | **Flexible windows** | A centered, proportional maze and readable HUD across wide, square, and portrait windows. |
 
-<details>
-<summary><strong>Windowed view · 1280 × 720</strong></summary>
-
-[![Windowed gameplay with a complete, centered maze and readable HUD](docs/screenshots/gameplay-windowed.png)](docs/screenshots/gameplay-windowed.png)
-
-Both screenshots are unedited captures of the real game window on Linux. Click either image to open the original PNG.
-
-</details>
-
 ## Quick start
 
 **Requirements:** .NET 8 SDK or newer, Vulkan graphics drivers, and a graphical desktop session.
