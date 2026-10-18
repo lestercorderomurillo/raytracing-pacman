@@ -185,6 +185,7 @@ public class PacmanMazeLevelScene : Scene
 
     public override void SetupECS()
     {
+        UDRQuality.Set(2); // Native resolution keeps small-window lighting and characters sharp.
         Renderer.LoadFont("PressStart2P", "fonts/PressStart2P.ttf");
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<PerformanceMonitor>();
@@ -317,6 +318,7 @@ public class PacmanMazeLevelScene : Scene
         Maze.GhostHouse = config.GhostHouse;
         Maze.NoUpTiles = config.NoUpTiles;
         Maze.BuildMaze();
+        Renderer.FitWorld(Renderer.VirtualSize / 2f, new Vector2(Maze.Cols * Maze.CellSize + 160f, Renderer.VirtualHeight));
         MazeRenderer.RenderMaze();
 
         Maze.SpawnCoins(config.CoinRadius * scale, config.CoinColor, 1f, config.PlayerStartCell);

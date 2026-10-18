@@ -6,6 +6,7 @@ using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 using RaytracingPacman;
 using Radiant.Testing;
+using Microsoft.Xna.Framework;
 
 var Engine = typeof(Scene).Assembly;
 var Game = typeof(PacmanMazeLevelScene).Assembly;
@@ -34,6 +35,19 @@ if (args.Contains("--graphics"))
 
 static void ExerciseGame(Scene Scene, int Frame)
 {
+    var Maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
+    var Renderer = Scene.Renderer;
+    var Center = new Vector2(Maze.OffsetX + Maze.Cols * Maze.CellSize / 2f,
+        Maze.OffsetY + Maze.Rows * Maze.CellSize / 2f);
+    if (Vector2.Distance(Renderer.WorldToScreen(Center), Renderer.ScreenSize / 2f) > 0.01f)
+        throw new Exception("Maze is not centered after resize or level transition.");
+    var HorizontalCell = Renderer.WorldToScreen(Center + new Vector2(Maze.CellSize, 0)) - Renderer.WorldToScreen(Center);
+    var VerticalCell = Renderer.WorldToScreen(Center + new Vector2(0, Maze.CellSize)) - Renderer.WorldToScreen(Center);
+    if (MathF.Abs(HorizontalCell.Length() - VerticalCell.Length()) > 0.01f)
+        throw new Exception("Window aspect ratio stretches maze cells.");
+    if (Vector2.Distance(Renderer.ScreenToWorld(Renderer.WorldToScreen(Center)), Center) > 0.01f)
+        throw new Exception("World-to-screen input mapping does not round-trip.");
+
     // Invoke the actual inspector callbacks, independent of window placement/DPI.
     var InspectorSystem = Scene.ECS.GetSystem<Inspector>();
     var WindowsField = typeof(Inspector).GetField("Windows", BindingFlags.Instance | BindingFlags.NonPublic);
