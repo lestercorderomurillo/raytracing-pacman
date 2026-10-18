@@ -10,7 +10,7 @@
 Collect every coin to advance. Power pellets let you eat frightened ghosts; getting caught restarts the level.
 
 - **Six levels:** a classic maze and five seeded layouts with different colors and ghost lineups.
-- **Seven ghost types:** Blinky, Pinky, Inky, Clyde, Dinky, Shadow, and a Rainbow ghost that splits and merges.
+- **Seven ghost types:** Blinky, Pinky, Inky, Clyde, Dinky, Shadow, and Rainbow.
 - **Dynamic lighting:** glowing walls, ghosts, coins, and power pellets.
 
 ## Play
@@ -28,5 +28,23 @@ Requires Linux x64, Vulkan graphics drivers, and a graphical desktop. Keep the b
 ## Controls
 
 [![Controls: arrow keys move Pac-Man; F1 toggles the inspector; Esc exits the game.](docs/controls.png)](docs/controls.png)
+
+## Ghosts
+
+| Blinky | Pinky | Inky |
+| :---: | :---: | :---: |
+| ![Red Blinky in game](docs/screenshots/ghosts/blinky.png) | ![Pink Pinky in game](docs/screenshots/ghosts/pinky.png) | ![Cyan Inky in game](docs/screenshots/ghosts/inky.png) |
+| Direct pursuit; retreats to the upper-right corner. | Direct pursuit; retreats to the upper-left corner. | Direct pursuit; retreats to the lower-right corner. |
+
+| Clyde | Dinky | Shadow |
+| :---: | :---: | :---: |
+| ![Orange Clyde in game](docs/screenshots/ghosts/clyde.png) | ![Green Dinky in game](docs/screenshots/ghosts/dinky.png) | ![Dark purple Shadow with white eyes in game](docs/screenshots/ghosts/shadow.png) |
+| Chases from afar; retreats when Pac-Man gets close. | Heads for random corners when Pac-Man gets close. | Dark body; moves up to 50% faster. |
+
+**Rainbow**
+
+![Rainbow split into three ghosts in the maze](docs/screenshots/ghosts/rainbow.png)
+
+Splits into three color-changing ghosts, then merges back into one.
 
 [Build and test instructions](BUILD.md). Built with [Radiant](https://github.com/lestercorderomurillo/radiant-game-engine) and MonoGame DesktopVK.
