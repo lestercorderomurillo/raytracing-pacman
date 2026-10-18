@@ -21,10 +21,6 @@
 
 [![Pac-Man and four ghosts illuminate a purple maze with glowing pellets](docs/screenshots/gameplay-maximized.png)](docs/screenshots/gameplay-maximized.png)
 
-<p align="center">
-  <sub>Actual Linux gameplay · Vulkan · Native rendering · 2880 × 1521</sub>
-</p>
-
 | In the game | What to explore |
 | --- | --- |
 | **Six levels** | A classic maze and seeded procedural layouts, with different palettes and ghost lineups. |
