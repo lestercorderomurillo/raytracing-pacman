@@ -1,100 +1,60 @@
 <h1 align="center">Raytracing Pac-Man</h1>
 
 <p align="center">
-  <strong>Classic maze chasing, lit by radiance cascades.</strong><br>
-  Built with <a href="https://github.com/lestercorderomurillo/radiant-game-engine">Radiant</a> and MonoGame DesktopVK.
+  <strong>Classic maze chasing with glowing walls and colorful ghosts.</strong>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/.NET-8-512BD4?style=flat-square" alt=".NET 8">
-  <img src="https://img.shields.io/badge/MonoGame-3.8.6-E73C00?style=flat-square" alt="MonoGame 3.8.6">
+  <a href="https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.0"><img src="https://img.shields.io/badge/release-v0.1.0-E73C00?style=flat-square" alt="Release v0.1.0"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
-  <a href="#controls">Controls</a> ·
-  <a href="#development">Development</a>
+  <a href="#the-game">The game</a> ·
+  <a href="#play">Play</a> ·
+  <a href="#controls">Controls</a>
 </p>
 
 [![Pac-Man and four ghosts illuminate a purple maze with glowing pellets](docs/screenshots/gameplay-maximized.png)](docs/screenshots/gameplay-maximized.png)
 
+## The game
+
+Collect every coin to advance to the next maze. Dodge the ghosts, grab power pellets to eat them while they're frightened, and watch the maze light up as you move. Getting caught restarts the current level.
+
 | In the game | What to explore |
 | --- | --- |
-| **Six levels** | A classic maze and seeded procedural layouts, with different palettes and ghost lineups. |
+| **Six levels** | A classic maze and five seeded layouts, each with its own colors and ghost lineup. |
 | **Seven ghost types** | Blinky, Pinky, Inky, Clyde, Dinky, Shadow, and a Rainbow ghost that splits and merges. |
-| **Dynamic lighting** | Glowing walls, ghosts, coins, and power pellets, with two global illumination modes and three upscalers. |
-| **Live controls** | Switch levels, restart, pause, and tune rendering from the runtime inspector. |
-| **Flexible windows** | A centered, proportional maze and readable HUD across wide, square, and portrait windows. |
+| **Dynamic lighting** | Walls, ghosts, coins, and power pellets cast colorful light through the corridors. |
 
-## Quick start
+## Play
 
-**Requirements:** .NET 8 SDK or newer, Vulkan graphics drivers, and a graphical desktop session.
+**[Download v0.1.0 for Linux x64](https://github.com/lestercorderomurillo/raytracing-pacman/releases/download/v0.1.0/raytracing-pacman-v0.1.0-linux-x64.tar.gz)** · [Release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.0)
 
-Clone the game and its engine next to each other, then run:
+Extract the archive and launch the game:
 
 ```sh
-git clone https://github.com/lestercorderomurillo/radiant-game-engine.git
-git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
-cd raytracing-pacman
-dotnet run -c Release
+tar -xzf raytracing-pacman-v0.1.0-linux-x64.tar.gz
+cd raytracing-pacman-v0.1.0-linux-x64
+./raytracing-pacman
 ```
 
-The first build restores the pinned MGCB tool and builds both projects and their content. Linux uses the native Vulkan runtime and shader compiler.
-
-```text
-Repositories/
-├── radiant-game-engine/
-└── raytracing-pacman/
-```
-
-Keep both checkouts on compatible revisions when changing the engine API. MonoGame also includes Windows and macOS backends; those platforms still need runtime verification.
-
-<details>
-<summary><strong>Use an engine checkout in another location</strong></summary>
-
-Set `RadiantRoot` when running or building the game project:
-
-```sh
-dotnet run --project raytracing-pacman.csproj -c Release -p:RadiantRoot=/absolute/path/to/radiant-game-engine
-```
-
-The solution and VS Code workspace use sibling checkout paths. For a different layout, target the game `.csproj` explicitly or update those paths to match.
-
-</details>
+Requires Linux x64, Vulkan graphics drivers, and a graphical desktop. The game runtime and assets are included; keep the extracted files together.
 
 ## Controls
 
 | Input | Action |
 | --- | --- |
 | <kbd>↑</kbd> <kbd>←</kbd> <kbd>↓</kbd> <kbd>→</kbd> | Move Pac-Man |
-| <kbd>F1</kbd> | Toggle the runtime inspector |
+| <kbd>F1</kbd> | Open or close the inspector |
 | <kbd>Esc</kbd> | Exit the game |
 | Inspector → **Scene** | Next/previous level, restart, and pause |
 | Inspector → **Pipeline** | Lighting and upscaler settings |
 
-Rendering starts at **Native** quality. Choose **Balanced** or **Performance** in the inspector to reduce GPU cost. The maze fits the window while preserving its proportions.
+For smoother performance, choose **Balanced** or **Performance** in the upscaler's **Quality** menu.
 
 ## Development
 
-Open the [VS Code workspace](raytracing-pacman.code-workspace) to edit the game and Radiant together. **F5** runs the game; **Ctrl + Shift + B** builds the solution.
+Game code lives in [`src`](src). See the [repository notes](CLAUDE.md) for build and test commands, and the [coding rules](AGENTS.md) for contributions.
 
-Game code lives in [`src`](src), assets in [`Content`](Content), and tests in [`tests`](tests). Radiant provides the engine and rendering through a source reference, so engine edits rebuild automatically.
-
-Build and run headless tests from the repository root:
-
-```sh
-dotnet build -c Release
-dotnet run --project tests/Pacman.Tests -c Release
-```
-
-Add `-- --graphics` to the test command for Vulkan checks across all six levels, resizing, and rendering modes.
-
-Publish a self-contained Linux build:
-
-```sh
-dotnet publish raytracing-pacman.csproj -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64
-./artifacts/linux-x64/raytracing-pacman
-```
-
-[Linux CI](.github/workflows/build.yml) checks formatting, builds, tests, and publishes. See the [coding rules](AGENTS.md) and [repository notes](CLAUDE.md) for details.
+Built with [Radiant](https://github.com/lestercorderomurillo/radiant-game-engine) and MonoGame DesktopVK.
