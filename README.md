@@ -27,8 +27,6 @@ Requires Linux x64, Vulkan graphics drivers, and a graphical desktop. Keep the b
 
 ## Controls
 
-[![Controls: arrow keys move Pac-Man; F1 toggles the inspector; Esc exits; Inspector → Scene changes levels, restarts, and pauses; Inspector → Pipeline changes lighting and upscaler settings.](docs/controls.png)](docs/controls.png)
-
-For smoother performance, choose **Balanced** or **Performance** in the upscaler's **Quality** menu.
+[![Controls: arrow keys move Pac-Man; F1 toggles the inspector; Esc exits the game.](docs/controls.png)](docs/controls.png)
 
 [Build and test instructions](BUILD.md). Built with [Radiant](https://github.com/lestercorderomurillo/radiant-game-engine) and MonoGame DesktopVK.
