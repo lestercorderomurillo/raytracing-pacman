@@ -31,20 +31,32 @@ Requires Linux x64, Vulkan graphics drivers, and a graphical desktop. Keep the b
 
 ## Ghosts
 
-| Blinky | Pinky | Inky |
-| :---: | :---: | :---: |
-| ![Red Blinky in game](docs/screenshots/ghosts/blinky.png) | ![Pink Pinky in game](docs/screenshots/ghosts/pinky.png) | ![Cyan Inky in game](docs/screenshots/ghosts/inky.png) |
-| Direct pursuit; retreats to the upper-right corner. | Direct pursuit; retreats to the upper-left corner. | Direct pursuit; retreats to the lower-right corner. |
+- **Blinky** — Direct pursuit; retreats to the upper-right corner.
 
-| Clyde | Dinky | Shadow |
-| :---: | :---: | :---: |
-| ![Orange Clyde in game](docs/screenshots/ghosts/clyde.png) | ![Green Dinky in game](docs/screenshots/ghosts/dinky.png) | ![Dark purple Shadow with white eyes in game](docs/screenshots/ghosts/shadow.png) |
-| Chases from afar; retreats when Pac-Man gets close. | Heads for random corners when Pac-Man gets close. | Dark body; moves up to 50% faster. |
+  ![Red Blinky in game](docs/screenshots/ghosts/blinky.png)
 
-**Rainbow**
+- **Pinky** — Direct pursuit; retreats to the upper-left corner.
 
-![Rainbow split into three ghosts in the maze](docs/screenshots/ghosts/rainbow.png)
+  ![Pink Pinky in game](docs/screenshots/ghosts/pinky.png)
 
-Splits into three color-changing ghosts, then merges back into one.
+- **Inky** — Direct pursuit; retreats to the lower-right corner.
+
+  ![Cyan Inky in game](docs/screenshots/ghosts/inky.png)
+
+- **Clyde** — Chases from afar; retreats when Pac-Man gets close.
+
+  ![Orange Clyde in game](docs/screenshots/ghosts/clyde.png)
+
+- **Dinky** — Heads for random corners when Pac-Man gets close.
+
+  ![Green Dinky in game](docs/screenshots/ghosts/dinky.png)
+
+- **Shadow** — Dark body; moves up to 50% faster.
+
+  ![Dark purple Shadow with white eyes in game](docs/screenshots/ghosts/shadow.png)
+
+- **Rainbow** — Splits into three color-changing ghosts, then merges back into one.
+
+  ![Rainbow changing colors, splitting into three ghosts, and merging in game](docs/screenshots/ghosts/rainbow.gif)
 
 [Build and test instructions](BUILD.md). Built with [Radiant](https://github.com/lestercorderomurillo/radiant-game-engine) and MonoGame DesktopVK.
