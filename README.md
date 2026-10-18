@@ -27,13 +27,7 @@ Requires Linux x64, Vulkan graphics drivers, and a graphical desktop. Keep the b
 
 ## Controls
 
-| Input | Action |
-| --- | --- |
-| <kbd>↑</kbd> <kbd>←</kbd> <kbd>↓</kbd> <kbd>→</kbd> | Move Pac-Man |
-| <kbd>F1</kbd> | Toggle the inspector |
-| <kbd>Esc</kbd> | Exit the game |
-| Inspector → **Scene** | Next/previous level, restart, and pause |
-| Inspector → **Pipeline** | Lighting and upscaler settings |
+[![Controls: arrow keys move Pac-Man; F1 toggles the inspector; Esc exits; Inspector → Scene changes levels, restarts, and pauses; Inspector → Pipeline changes lighting and upscaler settings.](docs/controls.png)](docs/controls.png)
 
 For smoother performance, choose **Balanced** or **Performance** in the upscaler's **Quality** menu.
 
