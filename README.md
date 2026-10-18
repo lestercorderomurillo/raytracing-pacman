@@ -14,9 +14,7 @@
 <p align="center">
   <a href="#quick-start">Quick start</a> ·
   <a href="#controls">Controls</a> ·
-  <a href="#project-layout">Project layout</a> ·
-  <a href="#development">Development</a> ·
-  <a href="#checks">Checks</a>
+  <a href="#development">Development</a>
 </p>
 
 [![Pac-Man and four ghosts illuminate a purple maze with glowing pellets](docs/screenshots/gameplay-maximized.png)](docs/screenshots/gameplay-maximized.png)
@@ -77,86 +75,26 @@ The solution and VS Code workspace use sibling checkout paths. For a different l
 
 Rendering starts at **Native** quality. Choose **Balanced** or **Performance** in the inspector to reduce GPU cost. The maze fits the window while preserving its proportions.
 
-## Project layout
-
-The game uses Radiant through a source project reference, so engine edits rebuild automatically. The application entry point stays small:
-
-```csharp
-using com.radiant.engine.runtime;
-using RaytracingPacman;
-
-new GameClient().Run(new PacmanMazeLevelScene(), new() { Title = "Raytracing Pac-Man" });
-```
-
-| Location | Responsibility |
-| --- | --- |
-| [`src/Scenes`](src/Scenes) | Level definitions and scene composition |
-| [`src/Maze`](src/Maze) | Maze generation, rendering, pellets, and level configuration |
-| [`src/Gameplay`](src/Gameplay) | Player movement, ghost behavior, and HUD |
-| [`Content`](Content) | Ghost/eye textures and the Press Start 2P font |
-| [`tests`](tests) | Headless checks, Vulkan smoke tests, and window captures |
-| [Radiant](https://github.com/lestercorderomurillo/radiant-game-engine) | ECS, renderer, lighting/upscaling shaders, window, inspector, and shared assets |
-
-[`raytracing-pacman.csproj`](raytracing-pacman.csproj) imports Radiant's `eng/Radiant.Desktop.props` and references `radiant.csproj`. Compiled engine content is copied through that reference, including during publishing. Engine test scenes remain in the engine repository and stay out of the production library.
-
 ## Development
 
-Open this folder in VS Code, or open [`raytracing-pacman.code-workspace`](raytracing-pacman.code-workspace) to work on the game and engine together. The checked-in solution includes both repositories and their test projects; C# Dev Kit uses it automatically.
+Open the [VS Code workspace](raytracing-pacman.code-workspace) to edit the game and Radiant together. **F5** runs the game; **Ctrl + Shift + B** builds the solution.
 
-| Shortcut | Action |
-| --- | --- |
-| <kbd>F5</kbd> | Build Debug and launch Pac-Man |
-| <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>B</kbd> | Build the solution |
+Game code lives in [`src`](src), assets in [`Content`](Content), and tests in [`tests`](tests). Radiant provides the engine and rendering through a source reference, so engine edits rebuild automatically.
 
-MonoGame `.fx` files are associated with HLSL. `dotnet build` validates shaders as part of the content build. If VS Code was open during the repository split, run **Developer: Reload Window** to replace its old generated solution.
-
-Follow [the coding rules](AGENTS.md): descriptive variable names, a blank line between logical chunks, and short, useful comments. [`.editorconfig`](.editorconfig) defines formatting and unused-code diagnostics; [`Directory.Build.props`](Directory.Build.props) enables those style checks during builds. Name clarity, logical grouping, and unused public state also receive manual review.
-
-## Checks
-
-Run from the repository root.
-
-**Formatting** — validate all tracked C# files:
-
-```sh
-git ls-files -z '*.cs' | xargs -0 dotnet format whitespace . --folder --verify-no-changes --include
-```
-
-**Headless tests** — check assembly boundaries and 64 deterministic, symmetric maze seeds:
-
-```sh
-dotnet run --project tests/Pacman.Tests -c Release
-```
-
-**Vulkan smoke tests** — exercise rendering and the actual inspector callbacks:
-
-```sh
-dotnet run --project tests/Pacman.Tests -c Release -- --graphics
-```
-
-The graphical run covers all six levels, resizing, centering, coordinate mapping, restart/previous-level controls, pause/resume, both lighting modes, and all three upscalers. Captures go to `artifacts/smoke`. The shared graphical harness is excluded from both production assemblies.
-
-<details>
-<summary><strong>Check the presented Linux window</strong></summary>
-
-Install Python with Pillow, `xdotool`, and ImageMagick, then run in an X11/XWayland desktop session:
+Build and run headless tests from the repository root:
 
 ```sh
 dotnet build -c Release
-python3 tests/window_layout.py
+dotnet run --project tests/Pacman.Tests -c Release
 ```
 
-This captures startup and six resizes, including square and portrait windows. It checks that the visible maze is centered, proportional, and unclipped, and saves images to `artifacts/window-layout`. The script stops only the game process it started.
+Add `-- --graphics` to the test command for Vulkan checks across all six levels, resizing, and rendering modes.
 
-</details>
-
-[Linux CI](.github/workflows/build.yml) checks out both repositories, validates formatting, builds, runs headless tests, and publishes the game. Builds reject unused locals, private members, parameters, and assignments. A manual workflow run accepts an `engine_ref` for checking a compatible engine branch; publish the engine changes before dependent game changes.
-
-## Publish for Linux
+Publish a self-contained Linux build:
 
 ```sh
 dotnet publish raytracing-pacman.csproj -c Release -r linux-x64 --self-contained true -o artifacts/linux-x64
 ./artifacts/linux-x64/raytracing-pacman
 ```
 
-Content paths are relative to the executable, so the published game can be launched from another directory.
+[Linux CI](.github/workflows/build.yml) checks formatting, builds, tests, and publishes. See the [coding rules](AGENTS.md) and [repository notes](CLAUDE.md) for details.
