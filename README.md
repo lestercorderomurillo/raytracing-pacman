@@ -55,6 +55,6 @@ For smoother performance, choose **Balanced** or **Performance** in the upscaler
 
 ## Development
 
-Game code lives in [`src`](src). See the [repository notes](CLAUDE.md) for build and test commands, and the [coding rules](AGENTS.md) for contributions.
+Game code lives in [`src`](src). See [BUILD.md](BUILD.md) for source setup, build instructions, and tests.
 
 Built with [Radiant](https://github.com/lestercorderomurillo/radiant-game-engine) and MonoGame DesktopVK.

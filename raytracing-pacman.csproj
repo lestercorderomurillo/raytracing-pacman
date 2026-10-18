@@ -13,6 +13,6 @@
     <Content Include="Content/fonts/*.ttf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="CheckRadiantCheckout" BeforeTargets="CollectPackageReferences;PrepareForBuild">
-    <Error Condition="!Exists('$(RadiantRoot)/eng/Radiant.Desktop.props')" Text="Clone radiant-game-engine beside this repository, or set -p:RadiantRoot=/path/to/radiant-game-engine. See README.md for the paired checkout instructions." />
+    <Error Condition="!Exists('$(RadiantRoot)/eng/Radiant.Desktop.props')" Text="Clone radiant-game-engine beside this repository, or set -p:RadiantRoot=/path/to/radiant-game-engine. See BUILD.md for the paired checkout instructions." />
   </Target>
 </Project>
