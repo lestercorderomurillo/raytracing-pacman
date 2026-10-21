@@ -9,7 +9,7 @@ namespace RaytracingPacman;
 
 public class PacmanMazeLevelScene : Scene
 {
-    private SystemGroup LightingGroup;
+    private HRCGI Lighting;
     private SystemGroup UpscalerGroup;
     private bool UpscalerEnabled = true;
     private ColorManagement Tonemapper;
@@ -186,13 +186,7 @@ public class PacmanMazeLevelScene : Scene
         ECS.AddSystem<Inspector>();
         ECS.AddSystem<PerformanceMonitor>();
         ECS.AddSystem<Geometry>();
-
-        LightingGroup = new SystemGroup("GI",
-            ("Holographic Radiance Cascades", ECS.AddSystem<HRCGI>()),
-            ("Radiance Cascades", ECS.AddSystem<RCGI>(enabled: false))
-        );
-        ECS.RegisterSystemGroup(LightingGroup);
-
+        Lighting = ECS.AddSystem<HRCGI>();
         Tonemapper = ECS.AddSystem<ColorManagement>();
 
         UpscalerGroup = new SystemGroup("Upscaler",
@@ -256,12 +250,6 @@ public class PacmanMazeLevelScene : Scene
         Inspector.AddDropdown("pipeline", "upscaler", "Upscaler", UpscalerGroup.Names, UpscalerGroup.ActiveIdx, (index) =>
         {
             UpscalerGroup.SetActive(index);
-            UpdateUpscalerInput();
-            UpdateWindowVisibility();
-        });
-        Inspector.AddDropdown("pipeline", "lighting", "Lighting", LightingGroup.Names, LightingGroup.ActiveIdx, (index) =>
-        {
-            LightingGroup.SetActive(index);
             UpdateUpscalerInput();
             UpdateWindowVisibility();
         });
@@ -546,11 +534,7 @@ public class PacmanMazeLevelScene : Scene
 
     private void UpdateUpscalerInput()
     {
-        Func<Texture2D> lightingSource = () =>
-            LightingGroup.Active is HRCGI holographicLighting ? holographicLighting.GetOutput() :
-            LightingGroup.Active is RCGI radianceLighting ? radianceLighting.GetOutput() : null;
-
-        Tonemapper.SetInputSource(lightingSource);
+        Tonemapper.SetInputSource(Lighting.GetOutput);
 
         Func<Texture2D> colorOutput = Tonemapper.GetOutput;
 
@@ -585,11 +569,6 @@ public class PacmanMazeLevelScene : Scene
 
     private void UpdateWindowVisibility()
     {
-        if (LightingGroup.Active is HRCGI)
-            Inspector.HideWindow("rcgi");
-        else
-            Inspector.HideWindow("hrcgi");
-
         string[] upscalerWindows = ["udr1", "udr2", "udr3"];
         string activeWindow = UpscalerEnabled ? UpscalerGroup.Active switch
         {

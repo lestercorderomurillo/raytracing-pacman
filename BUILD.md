@@ -16,7 +16,7 @@ git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
 cd raytracing-pacman
 ```
 
-Keep both checkouts on compatible revisions. The [v0.1.1 release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.1) record the exact revisions used for that release.
+Use Radiant v0.1.1 or a compatible later revision for the HRC viewport correction. Keep both checkouts on compatible revisions. The [v0.1.2 release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.2) record the exact revisions used for that release.
 
 ## Build and run
 
@@ -55,13 +55,13 @@ git ls-files -z '*.cs' | xargs -0 dotnet format whitespace . --folder --verify-n
 dotnet run --project tests/Pacman.Tests -c Release
 ```
 
-**Vulkan smoke tests** exercise all six levels, resizing, maze centering, coordinate mapping, scene controls, lighting modes, and upscalers. Captures go to `artifacts/smoke`:
+**Vulkan smoke tests** exercise all six levels, resizing, maze centering, coordinate mapping, scene controls, HRC lighting, and upscalers. Captures go to `artifacts/smoke`:
 
 ```sh
 dotnet run --project tests/Pacman.Tests -c Release -- --graphics
 ```
 
-**Rendering regressions** check eye alignment from actual rendered pixels, all three UDR upscalers and quality levels, both lighting modes, resizing, and disabling/re-enabling upscaling. Maze emission and light blocking are checked on every frame, including startup and immediately after resizing:
+**Rendering regressions** check eye alignment from actual rendered pixels, all three UDR upscalers and quality levels, HRC lighting, resizing, and disabling/re-enabling upscaling. Maze emission and light blocking are checked on every frame, including startup and immediately after resizing:
 
 ```sh
 dotnet run --project tests/Pacman.Tests -c Release -- --rendering
@@ -76,7 +76,7 @@ dotnet build -c Release
 python3 tests/window_layout.py
 ```
 
-The script checks startup and six resizes, including square and portrait windows, and saves captures to `artifacts/window-layout`. It stops only the game process it started.
+Set `PACMAN_EXECUTABLE` to the absolute path of a published executable to run the same checks on a release package. The script checks startup and six resizes, including square and portrait windows, and saves captures to `artifacts/window-layout`. It stops only the game process it started.
 
 [Linux CI](.github/workflows/build.yml) checks out both repositories, checks formatting, builds, runs headless tests, and runs the Linux publish command. Manual runs accept an `engine_ref` to select a compatible engine revision.
 

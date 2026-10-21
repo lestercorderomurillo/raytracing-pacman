@@ -12,18 +12,18 @@ using RaytracingPacman;
 sealed class RenderingWindow : Window
 {
     private readonly PacmanMazeLevelScene Scene = new();
-    private readonly (int width, int height, int quality, int upscaler, int lighting)[] Cases =
+    private readonly (int width, int height, int quality, int upscaler)[] Cases =
     [
-        (1280, 720, 1, 2, 0),
-        (1024, 640, 2, 2, 0),
-        (800, 1000, 0, 2, 0),
-        (1440, 600, 1, 0, 0),
-        (960, 960, 2, 0, 1),
-        (1280, 720, 0, 0, 1),
-        (1024, 640, 1, 1, 1),
-        (800, 1000, 2, 1, 0),
-        (1440, 600, 0, 1, 0),
-        (1024, 640, 1, 2, 0)
+        (1280, 720, 1, 2),
+        (1024, 640, 2, 2),
+        (800, 1000, 0, 2),
+        (1440, 600, 1, 0),
+        (960, 960, 2, 0),
+        (1280, 720, 0, 0),
+        (1024, 640, 1, 1),
+        (800, 1000, 2, 1),
+        (1440, 600, 0, 1),
+        (1024, 640, 1, 2)
     ];
     private readonly List<Vector2> CharacterCenters = [];
     private Dictionary<string, WindowData> InspectorWindows;
@@ -97,7 +97,7 @@ sealed class RenderingWindow : Window
         CaseIndex++;
         if (CaseIndex == Cases.Length)
         {
-            Console.WriteLine("PASS: fitted ghost/Rainbow/player eyes, all UDR qualities and upscalers, both lighting modes, resize, Native bypass, and disabled-upscaler isolation.");
+            Console.WriteLine("PASS: fitted ghost/Rainbow/player eyes, all UDR qualities and upscalers, HRC lighting, resize, Native bypass, and disabled-upscaler isolation.");
             Exit();
             return;
         }
@@ -107,7 +107,6 @@ sealed class RenderingWindow : Window
         GraphicsDeviceManager.PreferredBackBufferHeight = testCase.height;
         GraphicsDeviceManager.ApplyChanges();
         GetWidget("pipeline", "upscaler").DropdownCallback(testCase.upscaler);
-        GetWidget("pipeline", "lighting").DropdownCallback(testCase.lighting);
         UDRQuality.Set(testCase.quality);
         CaseStart = Frame;
     }
@@ -160,10 +159,8 @@ sealed class RenderingWindow : Window
         if (renderer.RenderScale != UDRQuality.ScaleNormalized)
             throw new Exception("Selected quality did not reach the renderer.");
 
-        Texture2D lighting = testCase.lighting == 0
-            ? Scene.ECS.GetSystem<HRCGI>().GetOutput() : Scene.ECS.GetSystem<RCGI>().GetOutput();
-        var expectedSize = testCase.lighting == 0
-            ? new Vector2(renderer.ScaledHigherPowerOfTwo) : renderer.ScaledSize;
+        Texture2D lighting = Scene.ECS.GetSystem<HRCGI>().GetOutput();
+        var expectedSize = renderer.ScaledSize;
         if (lighting.Width != expectedSize.X || lighting.Height != expectedSize.Y)
             throw new Exception("Lighting buffers did not use the selected render scale.");
         var color = Scene.ECS.GetSystem<ColorManagement>().GetOutput();

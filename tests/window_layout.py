@@ -2,6 +2,7 @@
 
 Requires Python with Pillow, xdotool, and ImageMagick's import command.
 Run from any directory: python3 tests/window_layout.py
+Set PACMAN_EXECUTABLE to validate a published package instead of the Release build.
 """
 
 import os
@@ -23,14 +24,14 @@ def verify_capture(path, expected_size):
         assert image.size == expected_size, f"Unexpected client size: {image.size}"
         width, height = image.size
 
-        # The first maze's saturated purple walls locate the board independently
+        # Locate the dim purple border as well as brightly lit walls, independently
         # of engine matrices, render-target readbacks, and the HUD.
         pixels = image.convert("RGB")
         points = [
             (column, row)
             for row in range(height)
             for column in range(width)
-            if (color := pixels.getpixel((column, row)))[2] > 110
+            if (color := pixels.getpixel((column, row)))[2] > 80
             and color[2] > color[0] * 1.5
             and color[2] > color[1] * 2
         ]
@@ -54,8 +55,8 @@ def main():
     for command in ["xdotool", "import"]:
         assert shutil.which(command), f"Install {command} before running this check."
 
-    executable = ROOT / "bin/Release/net8.0/raytracing-pacman"
-    assert executable.exists(), "Run dotnet build -c Release first."
+    executable = Path(os.environ.get("PACMAN_EXECUTABLE", ROOT / "bin/Release/net8.0/raytracing-pacman")).resolve()
+    assert executable.exists(), "Build Release or set PACMAN_EXECUTABLE to a published game."
     OUTPUT.mkdir(parents=True, exist_ok=True)
 
     with (OUTPUT / "game.log").open("w") as game_log, (OUTPUT / "desktop.log").open("w") as desktop_log:
