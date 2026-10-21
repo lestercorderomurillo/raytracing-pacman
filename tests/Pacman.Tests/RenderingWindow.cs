@@ -116,6 +116,7 @@ sealed class RenderingWindow : Window
     {
         base.Draw(gameTime);
         Frame++;
+        CheckMazeBackground();
         if (CaseIndex < 0 || CaseIndex >= Cases.Length || Frame - CaseStart < 12) return;
 
         CheckPipeline();
@@ -124,6 +125,30 @@ sealed class RenderingWindow : Window
         Console.WriteLine($"PASS rendering case {CaseIndex + 1}: {Cases[CaseIndex]}");
         NextCase();
         Scene.Renderer.PresentToBackBuffer();
+    }
+
+    private void CheckMazeBackground()
+    {
+        // Check every frame, including startup and the first frame after each resize.
+        var geometry = Scene.ECS.GetSystem<Geometry>();
+        var maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
+        var target = geometry.EmissiveTexture;
+        var pixels = new Color[target.Width * target.Height];
+        target.GetData(pixels);
+        var wallColor = maze.GetWallColor(1, 0);
+        int wallPixels = pixels.Count(pixel =>
+            Math.Abs(pixel.R - wallColor.R) <= 2 &&
+            Math.Abs(pixel.G - wallColor.G) <= 2 &&
+            Math.Abs(pixel.B - wallColor.B) <= 2);
+        if (wallPixels < 100)
+            throw new Exception($"Maze lighting disappeared on frame {Frame}, case {CaseIndex + 1}: {wallPixels} wall pixels.");
+
+        var wallCenter = Scene.Renderer.WorldToScreen(maze.CellCenter(1, 0));
+        var absorption = new Color[1];
+        geometry.AbsorptionTexture.GetData(0,
+            new Rectangle((int)wallCenter.X, (int)wallCenter.Y, 1, 1), absorption, 0, 1);
+        if (absorption[0] != Color.White)
+            throw new Exception($"Maze stopped blocking light on frame {Frame}, case {CaseIndex + 1}.");
     }
 
     private void CheckPipeline()

@@ -16,7 +16,7 @@ git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
 cd raytracing-pacman
 ```
 
-Keep both checkouts on compatible revisions. The [v0.1.0 release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.0) record the exact revisions used for that release.
+Keep both checkouts on compatible revisions. The [v0.1.1 release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.1) record the exact revisions used for that release.
 
 ## Build and run
 
@@ -61,7 +61,7 @@ dotnet run --project tests/Pacman.Tests -c Release
 dotnet run --project tests/Pacman.Tests -c Release -- --graphics
 ```
 
-**Rendering regressions** check eye alignment from actual rendered pixels, all three UDR upscalers and quality levels, both lighting modes, resizing, and disabling/re-enabling upscaling:
+**Rendering regressions** check eye alignment from actual rendered pixels, all three UDR upscalers and quality levels, both lighting modes, resizing, and disabling/re-enabling upscaling. Maze emission and light blocking are checked on every frame, including startup and immediately after resizing:
 
 ```sh
 dotnet run --project tests/Pacman.Tests -c Release -- --rendering

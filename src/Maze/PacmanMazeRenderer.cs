@@ -38,10 +38,11 @@ public class PacmanMazeRenderer : com.radiant.engine.core.System
         MazeAbsorptionTarget = null;
     }
 
-    public override void Render()
+    public override void Update()
     {
         if (Geometry == null) return;
 
+        // Geometry consumes and clears these inputs during Update, including after resize.
         Geometry.BackgroundEmissive = MazeEmissiveTarget;
         Geometry.BackgroundAbsorption = MazeAbsorptionTarget;
     }
