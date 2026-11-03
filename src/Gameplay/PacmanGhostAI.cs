@@ -205,7 +205,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                 material.Emissive = GhostColors[ghostIndex];
             }
 
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+            ref var transform = ref Scene.ECS.GetComponent<Transform2D>(GhostIds[ghostIndex]);
             var position = new Vector2(transform.Position.X, transform.Position.Y);
             EyePositions[ghostIndex] = position;
             PreviousPositions[ghostIndex] = position;
@@ -364,7 +364,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
             if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
             if (Scene.ECS.IsDisabled(GhostIds[ghostIndex])) continue;
 
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+            ref var transform = ref Scene.ECS.GetComponent<Transform2D>(GhostIds[ghostIndex]);
             PreviousPositions[ghostIndex] = new Vector2(transform.Position.X, transform.Position.Y);
         }
 
@@ -375,10 +375,11 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                 if (GhostIds[ghostIndex] == -1 || !Scene.ECS.IsAlive(GhostIds[ghostIndex])) continue;
                 if (Scene.ECS.IsDisabled(GhostIds[ghostIndex])) continue;
 
-                ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+                ref var transform = ref Scene.ECS.GetComponent<Transform2D>(GhostIds[ghostIndex]);
                 float wobble = MathF.Sin(IdleTime * 3f + ghostIndex * 1.7f) * 3f;
                 var position = Positions[ghostIndex];
-                transform.Position = new Vector3(position.X, position.Y + wobble, GhostDepth);
+                transform.Position = new Vector2(position.X, position.Y + wobble);
+                transform.Layer = GhostDepth;
             }
 
             return;
@@ -422,7 +423,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
                 currentMoveDistance = moveDistance * speedMultiplier;
             }
 
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(GhostIds[ghostIndex]);
+            ref var transform = ref Scene.ECS.GetComponent<Transform2D>(GhostIds[ghostIndex]);
             var position = Positions[ghostIndex];
             var targetPosition = Maze.CellCenter(GhostTargets[ghostIndex].x, GhostTargets[ghostIndex].y);
 
@@ -452,9 +453,10 @@ public class PacmanGhostAI : com.radiant.engine.core.System
             // Apply visual wobble without changing the maze position.
             var (directionX, directionY) = GhostDirections[ghostIndex];
             float wobble = MathF.Sin(ElapsedTime * 5f + ghostIndex * 2.5f) * 4f;
-            transform.Position = new Vector3(
+            transform.Position = new Vector2(
                 position.X + (directionY != 0 ? wobble : 0f),
-                position.Y + (directionX != 0 ? wobble : 0f), GhostDepth);
+                position.Y + (directionX != 0 ? wobble : 0f));
+            transform.Layer = GhostDepth;
 
             if (ExitedHouse[ghostIndex] && !Eaten[ghostIndex] && RespawnTimer[ghostIndex] <= 0f
                 && Player != null && !Player.PlayerCaught)
@@ -948,7 +950,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         RainbowEyeDirections = new (int, int)[rainbowCapacity];
         RainbowLogicalPositions = new Vector2[rainbowCapacity];
 
-        ref var transform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
+        ref var transform = ref Scene.ECS.GetComponent<Transform2D>(RainbowMainId);
         var position = new Vector2(transform.Position.X, transform.Position.Y);
         RainbowEyePositions[0] = position;
         RainbowPreviousPositions[0] = position;
@@ -1105,10 +1107,11 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
         if (Player == null || !Player.HasMoved)
         {
-            ref var transform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
+            ref var transform = ref Scene.ECS.GetComponent<Transform2D>(RainbowMainId);
             var position = RainbowLogicalPositions[0];
             float wobble = MathF.Sin(RainbowIdleTime * 3f) * 3f;
-            transform.Position = new Vector3(position.X, position.Y + wobble, GhostDepth);
+            transform.Position = new Vector2(position.X, position.Y + wobble);
+            transform.Layer = GhostDepth;
             return;
         }
 
@@ -1267,10 +1270,10 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
         for (int cloneIndex = RainbowCloneCount - 1; cloneIndex >= 0; cloneIndex--)
         {
-            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[cloneIndex]);
+            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform2D>(RainbowCloneIds[cloneIndex]);
             var clonePosition = new Vector2(cloneTransform.Position.X, cloneTransform.Position.Y);
 
-            ref var mainTransform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
+            ref var mainTransform = ref Scene.ECS.GetComponent<Transform2D>(RainbowMainId);
             var mainPosition = new Vector2(mainTransform.Position.X, mainTransform.Position.Y);
 
             if ((clonePosition - mainPosition).LengthSquared() < mergeDistanceSquared)
@@ -1281,7 +1284,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
             for (int otherIndex = cloneIndex - 1; otherIndex >= 0; otherIndex--)
             {
-                ref var otherTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[otherIndex]);
+                ref var otherTransform = ref Scene.ECS.GetComponent<Transform2D>(RainbowCloneIds[otherIndex]);
                 var otherPosition = new Vector2(otherTransform.Position.X, otherTransform.Position.Y);
 
                 if ((clonePosition - otherPosition).LengthSquared() < mergeDistanceSquared)
@@ -1326,7 +1329,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         else if (RainbowFrightenedTimer > 0f)
             moveDistance *= FrightenedSpeedMultiplier;
 
-        ref var transform = ref Scene.ECS.GetComponent<Transform>(entityId);
+        ref var transform = ref Scene.ECS.GetComponent<Transform2D>(entityId);
         var position = RainbowLogicalPositions[eyeIndex];
         var targetPosition = Maze.CellCenter(targetCell.x, targetCell.y);
 
@@ -1404,9 +1407,10 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
         // Apply visual wobble without changing the maze position.
         float wobble = MathF.Sin(RainbowElapsedTime * 5f + eyeIndex * 2.5f) * 4f;
-        transform.Position = new Vector3(
+        transform.Position = new Vector2(
             position.X + (direction.dy != 0 ? wobble : 0f),
-            position.Y + (direction.dx != 0 ? wobble : 0f), GhostDepth);
+            position.Y + (direction.dx != 0 ? wobble : 0f));
+        transform.Layer = GhostDepth;
         RainbowEyeDirections[eyeIndex] = direction;
 
         if (Player != null && !Player.PlayerCaught && RainbowMainExitedHouse
@@ -1722,13 +1726,13 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     private void RainbowShiftEyeHistory()
     {
         RainbowEyePositions[0] = RainbowPreviousPositions[0];
-        ref var mainTransform = ref Scene.ECS.GetComponent<Transform>(RainbowMainId);
+        ref var mainTransform = ref Scene.ECS.GetComponent<Transform2D>(RainbowMainId);
         RainbowPreviousPositions[0] = new Vector2(mainTransform.Position.X, mainTransform.Position.Y);
 
         for (int cloneIndex = 0; cloneIndex < RainbowCloneCount; cloneIndex++)
         {
             RainbowEyePositions[1 + cloneIndex] = RainbowPreviousPositions[1 + cloneIndex];
-            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform>(RainbowCloneIds[cloneIndex]);
+            ref var cloneTransform = ref Scene.ECS.GetComponent<Transform2D>(RainbowCloneIds[cloneIndex]);
             RainbowPreviousPositions[1 + cloneIndex] = new Vector2(cloneTransform.Position.X, cloneTransform.Position.Y);
         }
     }

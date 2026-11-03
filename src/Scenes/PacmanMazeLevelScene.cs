@@ -192,7 +192,8 @@ public class PacmanMazeLevelScene : Scene
         UpscalerGroup = new SystemGroup("Upscaler",
             ("UDR1.0", ECS.AddSystem<UDR1>(enabled: false)),
             ("UDR2.0", ECS.AddSystem<UDR2>(enabled: false)),
-            ("UDR3.0", ECS.AddSystem<UDR3>())
+            ("UDR3.0", ECS.AddSystem<UDR3>(enabled: false)),
+            ("UDR4.0", ECS.AddSystem<UDR4>())
         );
         ECS.RegisterSystemGroup(UpscalerGroup);
 
@@ -283,6 +284,7 @@ public class PacmanMazeLevelScene : Scene
 
     private void LoadLevel(int levelIndex)
     {
+        ECS.GetSystem<UDR4>()?.ResetHistory();
         GhostAI.Clear();
         GhostAI.ClearRainbow();
         PlayerController.Clear();
@@ -478,11 +480,11 @@ public class PacmanMazeLevelScene : Scene
                 (byte)MathF.Min(BaseCoinColor.B * brightness, 255f),
                 alpha);
 
-            ref var coinTransform = ref ECS.GetComponent<Transform>(coinId);
+            ref var coinTransform = ref ECS.GetComponent<Transform2D>(coinId);
             coinTransform.Position.X = coinX;
             coinTransform.Position.Y = coinY;
             float coinScale = 1f + proximity * 0.6f;
-            coinTransform.Scale = new Vector3(coinScale, coinScale, 1f);
+            coinTransform.Scale = new Vector2(coinScale);
         }
 
         foreach (var (cell, pelletId) in Maze.PowerPelletCells)
@@ -522,11 +524,11 @@ public class PacmanMazeLevelScene : Scene
                 (byte)MathF.Min((255f * (1f - tint) + rainbow.B * tint) * brightness, 255f),
                 BasePowerPelletColor.A);
 
-            ref var pelletTransform = ref ECS.GetComponent<Transform>(pelletId);
+            ref var pelletTransform = ref ECS.GetComponent<Transform2D>(pelletId);
             pelletTransform.Position.X = pelletX;
             pelletTransform.Position.Y = pelletY;
             float pelletScale = 1f + proximity * 0.6f;
-            pelletTransform.Scale = new Vector3(pelletScale, pelletScale, 1f);
+            pelletTransform.Scale = new Vector2(pelletScale);
         }
 
         Inspector.SetLabel("scene", "level", $"Level: {CurrentLevel + 1}/{Levels.Length}");
@@ -545,6 +547,7 @@ public class PacmanMazeLevelScene : Scene
                 case UDR1 firstUpscaler: firstUpscaler.SetInputSource(colorOutput); break;
                 case UDR2 secondUpscaler: secondUpscaler.SetInputSource(colorOutput); break;
                 case UDR3 thirdUpscaler: thirdUpscaler.SetInputSource(colorOutput); break;
+                case UDR4 temporalUpscaler: temporalUpscaler.SetInputSource(colorOutput); break;
             }
         });
     }
@@ -569,12 +572,13 @@ public class PacmanMazeLevelScene : Scene
 
     private void UpdateWindowVisibility()
     {
-        string[] upscalerWindows = ["udr1", "udr2", "udr3"];
+        string[] upscalerWindows = ["udr1", "udr2", "udr3", "udr4"];
         string activeWindow = UpscalerEnabled ? UpscalerGroup.Active switch
         {
             UDR1 => "udr1",
             UDR2 => "udr2",
             UDR3 => "udr3",
+            UDR4 => "udr4",
             null => "",
             _ => ""
         } : "";

@@ -16,7 +16,7 @@ git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
 cd raytracing-pacman
 ```
 
-Use Radiant v0.1.1 or a compatible later revision for the HRC viewport correction. Keep both checkouts on compatible revisions. The [v0.1.2 release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.2) record the exact revisions used for that release.
+Use [Radiant v0.2.0](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.2.0) for the `Transform2D` ECS API and UDR4 renderer. Pac-Man v0.2.0 is paired with that engine release. Keep both checkouts on compatible revisions.
 
 ## Build and run
 
@@ -61,13 +61,13 @@ dotnet run --project tests/Pacman.Tests -c Release
 dotnet run --project tests/Pacman.Tests -c Release -- --graphics
 ```
 
-**Rendering regressions** check eye alignment from actual rendered pixels, all three UDR upscalers and quality levels, HRC lighting, resizing, and disabling/re-enabling upscaling. Maze emission and light blocking are checked on every frame, including startup and immediately after resizing:
+**Rendering regressions** check eye alignment from actual rendered pixels, all four UDR upscalers and quality levels, HRC lighting, resizing, and disabling/re-enabling upscaling. Maze emission and light blocking are checked on every frame, including startup and immediately after resizing:
 
 ```sh
 dotnet run --project tests/Pacman.Tests -c Release -- --rendering
 ```
 
-Gameplay starts with UDR3 in Balanced quality (50% lighting render scale). F1 opens the inspector; use Pipeline to select the upscaler and its quality settings to choose Performance (25%), Balanced (50%), or Native (100%).
+Gameplay starts with UDR4 in Balanced quality (50% lighting render scale). F1 opens the inspector; use Pipeline to select the upscaler and its quality settings to choose Performance (25%), Balanced (50%), or Native (100%).
 
 **Presented-window checks** require an X11/XWayland desktop, Python with Pillow, `xdotool`, and ImageMagick:
 
@@ -88,3 +88,7 @@ dotnet publish raytracing-pacman.csproj -c Release -r linux-x64 --self-contained
 ```
 
 The output includes the .NET runtime, engine, and game content. Keep the published files together. Content paths resolve relative to the executable, so it can launch from another working directory.
+
+UDR4 requires the matching engine checkout with `UDR4` and its shader. It reconstructs jittered HRC lighting with floating-point motion and conservative temporal history rejection. UDR1–3 remain available for comparisons. See [engine UDR4 notes](../radiant-game-engine/docs/UDR4.md) for limitations and validation.
+
+To refresh the unedited 2880×1521 gameplay capture, run the test harness with `--capture` on an isolated display. It validates the resolution and visible content before saving `artifacts/captures/gameplay-maximized.png`.

@@ -14,6 +14,9 @@ sealed class RenderingWindow : Window
     private readonly PacmanMazeLevelScene Scene = new();
     private readonly (int width, int height, int quality, int upscaler)[] Cases =
     [
+        (1280, 720, 1, 3),
+        (1024, 640, 2, 3),
+        (800, 1000, 0, 3),
         (1280, 720, 1, 2),
         (1024, 640, 2, 2),
         (800, 1000, 0, 2),
@@ -86,7 +89,8 @@ sealed class RenderingWindow : Window
 
         player.Track(player.EntityId, (1, 23), 65530f);
         var playerCenter = maze.CellCenter(1, 23);
-        Scene.ECS.GetComponent<Transform>(player.EntityId).Position = new Vector3(playerCenter, 65530f);
+        Scene.ECS.GetComponent<Transform2D>(player.EntityId).Position = playerCenter;
+        Scene.ECS.GetComponent<Transform2D>(player.EntityId).Layer = 65530f;
         CharacterCenters.Add(playerCenter);
         Scene.ECS.GameplayPaused = true;
         Scene.ECS.AnimationPaused = true;
@@ -168,13 +172,24 @@ sealed class RenderingWindow : Window
             throw new Exception("Tonemapping did not follow lighting resolution.");
 
         com.radiant.engine.core.System[] upscalers =
-        [Scene.ECS.GetSystem<UDR1>(), Scene.ECS.GetSystem<UDR2>(), Scene.ECS.GetSystem<UDR3>()];
+        [Scene.ECS.GetSystem<UDR1>(), Scene.ECS.GetSystem<UDR2>(), Scene.ECS.GetSystem<UDR3>(), Scene.ECS.GetSystem<UDR4>()];
         if (upscalers.Count(upscaler => upscaler.Enabled) != 1 || !upscalers[testCase.upscaler].Enabled)
             throw new Exception("Exactly the selected upscaler must be active.");
+        var temporal = Scene.ECS.GetSystem<UDR4>();
+        if (temporal.Enabled && testCase.quality != 2)
+        {
+            if (temporal.HistoryFrames < 2 || Scene.ECS.GetSystem<Geometry>().TemporalMotionTexture == null)
+                throw new Exception("UDR4 is not accumulating history or receiving precise motion.");
+            var output = temporal.GetOutput();
+            if (output.Width != renderer.ScreenWidth || output.Height != renderer.ScreenHeight)
+                throw new Exception("UDR4 output dimensions are incorrect.");
+        }
+        if ((!temporal.Enabled || testCase.quality == 2) && Scene.ECS.GetSystem<HRCGI>().OutputJitter != Vector2.Zero)
+            throw new Exception("UDR4 jitter leaked into another upscaler or Native mode.");
         if (testCase.quality == 2 && testCase.upscaler > 0)
         {
             var active = upscalers[testCase.upscaler];
-            int accumulatedFrames = (int)active.GetType().GetField("FrameIndex", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(active);
+            int accumulatedFrames = active is UDR4 temporalUpscaler ? temporalUpscaler.HistoryFrames : (int)active.GetType().GetField("FrameIndex", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(active);
             if (accumulatedFrames != 0)
                 throw new Exception("Native mode still runs unused temporal upscaling passes.");
         }

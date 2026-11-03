@@ -151,7 +151,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
 
         if (!Scene.ECS.IsAlive(EntityId)) return;
 
-        ref var transform = ref Scene.ECS.GetComponent<Transform>(EntityId);
+        ref var transform = ref Scene.ECS.GetComponent<Transform2D>(EntityId);
 
         var position = WorldPosition;
         var targetPosition = Maze.CellCenter(TargetCell.x, TargetCell.y);
@@ -203,7 +203,8 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         float wobble = MathF.Sin(IdleTime * 3f) * 3f;
         WobbleX = CurrentDirection.dy != 0 ? wobble : 0f;
         WobbleY = CurrentDirection.dy != 0 ? 0f : wobble;
-        transform.Position = new Vector3(position.X + WobbleX, position.Y + WobbleY, Depth);
+        transform.Position = new Vector2(position.X + WobbleX, position.Y + WobbleY);
+        transform.Layer = Depth;
         WorldPosition = position;
 
         if (CurrentDirection != (0, 0))

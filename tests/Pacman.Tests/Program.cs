@@ -41,6 +41,11 @@ else if (args.Contains("--rendering"))
     using var window = new RenderingWindow();
     window.Run();
 }
+else if (args.Contains("--capture"))
+{
+    using var window = new GameplayCaptureWindow();
+    window.Run();
+}
 
 static void ExerciseGame(Scene scene, int frameNumber)
 {
@@ -82,6 +87,7 @@ static void ExerciseGame(Scene scene, int frameNumber)
     if (frameNumber == 35) GetWidget("pipeline", "upscaler").DropdownCallback(0);
     if (frameNumber == 45) GetWidget("pipeline", "upscaler").DropdownCallback(1);
     if (frameNumber == 55) GetWidget("pipeline", "upscaler").DropdownCallback(2);
+    if (frameNumber == 65) GetWidget("pipeline", "upscaler").DropdownCallback(3);
     if (frameNumber == 70) GetWidget("scene", "restartLevel").ButtonCallback();
 
     if (frameNumber == 75)
