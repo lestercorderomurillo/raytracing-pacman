@@ -219,6 +219,7 @@ public class PacmanMazeLevelScene : Scene
         UpdateUpscalerInput();
 
         Inspector.CreateWindow("scene", "Scene", 2, Visible: false);
+        Inspector.AddButton("scene", "cameraControls", "Camera controls", () => Inspector.OpenCameraControls());
 
         Inspector.AddLabel("scene", "level", $"Level: 1/{Levels.Length}");
 

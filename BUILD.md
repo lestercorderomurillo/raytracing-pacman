@@ -92,3 +92,7 @@ The output includes the .NET runtime, engine, and game content. Keep the publish
 UDR4 requires the matching engine checkout with `UDR4` and its shader. It reconstructs jittered HRC lighting with floating-point motion and conservative temporal history rejection. UDR1–3 remain available for comparisons. See [engine UDR4 notes](../radiant-game-engine/docs/UDR4.md) for limitations and validation.
 
 To refresh the unedited 2880×1521 gameplay capture, run the test harness with `--capture` on an isolated display. It validates the resolution and visible content before saving `artifacts/captures/gameplay-maximized.png`.
+
+## Shared camera controller
+
+With Radiant v0.2.1, open F1 > ECS > Open Camera Controls, or use the Camera controls button in the game settings. The single window searches camera IDs/types and selects instances independently of the entity inspector. This game uses the fitted 2D World view: enable Navigate camera and hold RMB with WASD to pan, or use Zoom in / Zoom out. Adjust movement speed for world units. Closing the controller stops navigation. Changing levels restores the game framing where the scene calls FitWorld.
