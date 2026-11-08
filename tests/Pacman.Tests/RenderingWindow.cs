@@ -9,6 +9,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using RaytracingPacman;
 
+/// <summary>Exercises the game's lighting, reconstruction, and character overlays through pixel checks.</summary>
 sealed class RenderingWindow : Window
 {
     private readonly PacmanMazeLevelScene Scene = new();
@@ -35,6 +36,7 @@ sealed class RenderingWindow : Window
     private int CaseStart;
     private float BodyRadius;
 
+    /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public RenderingWindow()
         : base(new GameLoop(), new() { Title = "Pac-Man rendering regression checks", Width = 1280, Height = 720 })
     {
@@ -43,6 +45,7 @@ sealed class RenderingWindow : Window
         GameLoop.SetTargetFps(0);
     }
 
+    /// <inheritdoc/>
     protected override void Update(GameTime gameTime)
     {
         base.Update(gameTime);
@@ -59,12 +62,14 @@ sealed class RenderingWindow : Window
         NextCase();
     }
 
+    /// <summary>Finds a named inspector widget required by the regression case.</summary>
     private Widget GetWidget(string windowId, string widgetId)
     {
         var window = InspectorWindows[windowId];
         return window.Widgets[window.WidgetIndex[widgetId]];
     }
 
+    /// <summary>Places player and ghosts at controlled positions for overlay pixel checks.</summary>
     private void StageCharacters()
     {
         var maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
@@ -96,6 +101,7 @@ sealed class RenderingWindow : Window
         Scene.ECS.AnimationPaused = true;
     }
 
+    /// <summary>Advances the rendering harness to its next configured test case.</summary>
     private void NextCase()
     {
         CaseIndex++;
@@ -115,6 +121,7 @@ sealed class RenderingWindow : Window
         CaseStart = Frame;
     }
 
+    /// <inheritdoc/>
     protected override void Draw(GameTime gameTime)
     {
         base.Draw(gameTime);
@@ -130,6 +137,7 @@ sealed class RenderingWindow : Window
         Scene.Renderer.PresentToBackBuffer();
     }
 
+    /// <summary>Checks maze color and emission targets for the active level.</summary>
     private void CheckMazeBackground()
     {
         // Check every frame, including startup and the first frame after each resize.
@@ -154,6 +162,7 @@ sealed class RenderingWindow : Window
             throw new Exception($"Maze stopped blocking light on frame {Frame}, case {CaseIndex + 1}.");
     }
 
+    /// <summary>Checks that the active lighting and reconstruction stages have valid outputs.</summary>
     private void CheckPipeline()
     {
         var renderer = Scene.Renderer;
@@ -195,6 +204,7 @@ sealed class RenderingWindow : Window
         }
     }
 
+    /// <summary>Checks eye-overlay placement against the rendered character positions.</summary>
     private void CheckEyes()
     {
         var renderer = Scene.Renderer;
@@ -239,6 +249,7 @@ sealed class RenderingWindow : Window
             throw new Exception($"Eye overlays are detached: {outsideBody} pixels outside bodies; eye pixels per body: {string.Join(", ", eyePixels)}.");
     }
 
+    /// <summary>Checks output and resource behavior while reconstruction is bypassed.</summary>
     private void CheckDisabledUpscaler()
     {
         GetWidget("pipeline", "upscalerToggle").ToggleCallback(false);

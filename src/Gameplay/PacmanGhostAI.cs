@@ -6,6 +6,7 @@ using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
+/// <summary>Controls ghost targeting, frightened behavior, respawning, and rainbow clones.</summary>
 [Pausable(PauseGroup.Gameplay | PauseGroup.Animation)]
 [SystemTag("Pacman")]
 public class PacmanGhostAI : com.radiant.engine.core.System
@@ -18,14 +19,21 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     public PacmanPlayerController Player { get; set; }
 
     public int GhostCount => GhostIds?.Length ?? 0;
+    /// <summary>Returns the regular ghost's world-space eye position.</summary>
     public Vector2 GetGhostEyePosition(int ghostIndex) => EyePositions[ghostIndex];
+    /// <summary>Returns the regular ghost's current grid movement direction.</summary>
     public (int dx, int dy) GetGhostDirection(int ghostIndex) => GhostDirections[ghostIndex];
+    /// <summary>Reports whether the regular ghost is in its frightened state.</summary>
     public bool IsGhostFrightened(int ghostIndex) => Frightened[ghostIndex];
+    /// <summary>Reports whether the regular ghost is returning to the house after being eaten.</summary>
     public bool IsGhostEaten(int ghostIndex) => Eaten[ghostIndex];
+    /// <summary>Returns the personality assigned to a regular ghost.</summary>
     public PacmanGhostType GetGhostType(int ghostIndex) => GhostEntries[ghostIndex].Type;
 
     public int RainbowTotalCount => RainbowInitialized ? 1 + RainbowCloneCount : 0;
+    /// <summary>Returns the rainbow ghost or clone eye position in world space.</summary>
     public Vector2 GetRainbowEyePosition(int eyeIndex) => RainbowEyePositions[eyeIndex];
+    /// <summary>Returns the rainbow ghost or clone's current movement direction.</summary>
     public (int dx, int dy) GetRainbowEyeDirection(int eyeIndex) => RainbowEyeDirections[eyeIndex];
     public bool RainbowIsMainEaten => RainbowMainEaten;
     public bool RainbowIsFrightened => RainbowFrightenedTimer > 0f;
@@ -120,6 +128,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     private (int x, int y)[] RainbowCornerTargets = new (int, int)[1 + MaxClones];
     private float RainbowIdleTime;
 
+    /// <summary>Returns the display color associated with a ghost personality.</summary>
     public static Color PersonalityColor(PacmanGhostType ghostType) => ghostType switch
     {
         PacmanGhostType.Blinky => new Color(255, 0, 20),
@@ -132,6 +141,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         _ => Color.White
     };
 
+    /// <summary>Chooses a corner target for scatter behavior.</summary>
     private (int x, int y) RandomScatterCorner() => RandomGenerator.Next(4) switch
     {
         0 => (Maze.Columns - 3, 0),
@@ -140,6 +150,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         _ => (0, Maze.Rows - 1)
     };
 
+    /// <summary>Returns the scatter target associated with a ghost personality.</summary>
     private (int x, int y) ScatterTarget(PacmanGhostType ghostType) => ghostType switch
     {
         PacmanGhostType.Blinky => (Maze.Columns - 3, 0),
@@ -153,6 +164,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
 
     Texture2D EyesTexture;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
@@ -160,6 +172,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         EyesTexture = Renderer.GetTexture("Eyes");
     }
 
+    /// <summary>Attaches regular ghost behavior to the supplied entities and starting cells.</summary>
     public void Track(int[] entityIds, (int x, int y)[] startCells, GhostEntry[] entries)
     {
         int ghostCount = entityIds.Length;
@@ -218,6 +231,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         CurrentMode = PacmanGhostMode.Scatter;
     }
 
+    /// <summary>Clears regular ghost tracking and resets its behavior state.</summary>
     public void Clear()
     {
         if (GhostIds == null) return;
@@ -228,6 +242,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         GhostIds = null;
     }
 
+    /// <summary>Starts frightened behavior for regular ghosts for the requested duration.</summary>
     public void SetFrightened(float duration)
     {
         if (GhostIds == null) return;
@@ -258,6 +273,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
         float deltaTime = (float)GameTime.ElapsedGameTime.TotalSeconds;
@@ -265,6 +281,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         UpdateRainbowGhost(deltaTime);
     }
 
+    /// <summary>Hides tracked ghost geometry during scene or player transitions.</summary>
     public void HideGhostEntities()
     {
         if (GhostIds != null)
@@ -299,6 +316,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Restores visibility of tracked ghost geometry.</summary>
     public void ShowGhostEntities()
     {
         if (GhostIds != null)
@@ -344,6 +362,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         if (!RainbowInitialized) return;
@@ -352,6 +371,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
             RainbowDestroyClone(cloneIndex);
     }
 
+    /// <summary>Advances regular ghost movement, targeting, collisions, and respawning.</summary>
     private void UpdateRegularGhosts(float deltaTime)
     {
         if (GhostIds == null) return;
@@ -476,6 +496,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Awards the eaten-ghost transition and sends the ghost back toward its house.</summary>
     private void EatGhost(int ghostIndex)
     {
         Eaten[ghostIndex] = true;
@@ -490,6 +511,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         circle.Radius = BodyRadius;
     }
 
+    /// <summary>Restores a ghost at its home cell after the return journey.</summary>
     private void RespawnGhost(int ghostIndex)
     {
         RespawnTimer[ghostIndex] = 0f;
@@ -509,6 +531,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Restores the regular ghost's personality color after a temporary state.</summary>
     private void RestoreGhostColor(int ghostIndex)
     {
         if (Eaten[ghostIndex] || RespawnTimer[ghostIndex] > 0f) return;
@@ -527,6 +550,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Advances the chase/scatter schedule and frightened timers.</summary>
     private void UpdateMode(float deltaTime)
     {
         for (int ghostIndex = 0; ghostIndex < GhostIds.Length; ghostIndex++)
@@ -579,6 +603,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Checks maze movement with the ghost's current house and return-state rules.</summary>
     private bool CanGhostMove(int ghostIndex, int cellX, int cellY, int directionX, int directionY)
     {
         if (!Maze.CanMove(cellX, cellY, directionX, directionY)) return false;
@@ -593,6 +618,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return true;
     }
 
+    /// <summary>Computes a regular ghost's target from its personality and current mode.</summary>
     private (int x, int y) GetTargetTile(int ghostIndex)
     {
         if (CurrentMode == PacmanGhostMode.Scatter)
@@ -652,6 +678,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return ChaseTargets[ghostIndex];
     }
 
+    /// <summary>Chooses the next regular-ghost turn toward its target tile.</summary>
     private void PickDirection(int ghostIndex)
     {
         var (cellX, cellY) = GhostCells[ghostIndex];
@@ -734,6 +761,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         GhostTargets[ghostIndex] = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
+    /// <summary>Chooses a path back to the ghost house for an eaten ghost.</summary>
     private void PickEatenPath(int ghostIndex)
     {
         var (cellX, cellY) = GhostCells[ghostIndex];
@@ -809,6 +837,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         GhostTargets[ghostIndex] = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
+    /// <summary>Chooses the next movement step out of the ghost house.</summary>
     private void PickHouseExit(int ghostIndex)
     {
         var (cellX, cellY) = GhostCells[ghostIndex];
@@ -842,6 +871,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Chooses movement inside the ghost house while awaiting release.</summary>
     private void PickHouseWander(int ghostIndex)
     {
         var (cellX, cellY) = GhostCells[ghostIndex];
@@ -867,6 +897,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Chooses a random legal turn for a frightened ghost.</summary>
     private void PickRandom(int ghostIndex)
     {
         var (cellX, cellY) = GhostCells[ghostIndex];
@@ -891,6 +922,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         GhostTargets[ghostIndex] = (cellX + chosenDirection.dx, cellY + chosenDirection.dy);
     }
 
+    /// <summary>Tests the regular ghost's time and collectible release thresholds.</summary>
     private bool IsReleased(int ghostIndex)
     {
         if (RespawnTimer[ghostIndex] > 0f) return false;
@@ -909,6 +941,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return false;
     }
 
+    /// <summary>Chooses a random traversable cell as a movement target.</summary>
     private (int x, int y) PickRandomWalkable()
     {
         for (int attempt = 0; attempt < 100; attempt++)
@@ -922,6 +955,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return (Maze.Columns / 2, 0);
     }
 
+    /// <summary>Attaches rainbow behavior to its main entity and release thresholds.</summary>
     public void TrackRainbow(int entityId, (int x, int y) startCell, float releaseTime = 0f, float releaseAtCoinPercent = 0f)
     {
         RainbowMainId = entityId;
@@ -962,6 +996,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         RainbowUpdateMainColor();
     }
 
+    /// <summary>Destroys rainbow clones and resets rainbow tracking state.</summary>
     public void ClearRainbow()
     {
         if (!RainbowInitialized) return;
@@ -973,6 +1008,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         RainbowInitialized = false;
     }
 
+    /// <summary>Starts frightened behavior for the rainbow ghost and its clones.</summary>
     public void SetRainbowFrightened(float duration)
     {
         if (!RainbowInitialized) return;
@@ -1020,6 +1056,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Advances rainbow movement, cloning, merging, and frightened-state transitions.</summary>
     private void UpdateRainbowGhost(float deltaTime)
     {
         if (!RainbowInitialized) return;
@@ -1198,6 +1235,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Transitions the selected rainbow entity into its eaten return state.</summary>
     private void RainbowEatEntity(int eyeIndex)
     {
         if (eyeIndex == 0)
@@ -1216,6 +1254,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Restores the main rainbow entity after its return to the house.</summary>
     private void RainbowRespawnMain()
     {
         RainbowMainEaten = false;
@@ -1226,6 +1265,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         RainbowUpdateMainColor();
     }
 
+    /// <summary>Creates a rainbow clone from the selected eye entity.</summary>
     private void RainbowSpawnClone(int sourceEyeIndex)
     {
         int cloneIndex = RainbowCloneCount;
@@ -1264,6 +1304,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         RainbowCloneCount++;
     }
 
+    /// <summary>Merges eligible rainbow clones when their paths meet.</summary>
     private void RainbowCheckMerges()
     {
         float mergeDistanceSquared = BodyRadius * 2f * BodyRadius * 2f;
@@ -1296,6 +1337,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Removes a rainbow clone and its associated entity state.</summary>
     private void RainbowDestroyClone(int cloneIndex)
     {
         Scene.ECS.DestroyEntity(RainbowCloneIds[cloneIndex]);
@@ -1318,6 +1360,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         RainbowCloneCount--;
     }
 
+    /// <summary>Advances one rainbow entity between maze cells using its selected direction.</summary>
     private void RainbowMoveEntity(ref (int x, int y) cell, ref (int x, int y) targetCell,
         ref (int dx, int dy) direction, int entityId, float deltaTime, int eyeIndex)
     {
@@ -1430,6 +1473,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Chooses the next house-bound step for an eaten rainbow entity.</summary>
     private void RainbowPickEatenPath(ref (int x, int y) cell, ref (int x, int y) targetCell,
         ref (int dx, int dy) direction)
     {
@@ -1507,6 +1551,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         targetCell = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
+    /// <summary>Chooses a random legal turn for a rainbow entity.</summary>
     private void RainbowPickRandom(ref (int x, int y) cell, ref (int x, int y) targetCell,
         ref (int dx, int dy) direction)
     {
@@ -1536,6 +1581,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         targetCell = (cellX + chosenDirection.dx, cellY + chosenDirection.dy);
     }
 
+    /// <summary>Guides a rainbow entity from the house to the maze.</summary>
     private void RainbowPickHouseExit(ref (int x, int y) cell, ref (int x, int y) targetCell,
         ref (int dx, int dy) direction)
     {
@@ -1570,6 +1616,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Moves a rainbow entity within the house before release.</summary>
     private void RainbowPickHouseWander(ref (int x, int y) cell, ref (int x, int y) targetCell,
         ref (int dx, int dy) direction)
     {
@@ -1596,6 +1643,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Selects the next rainbow turn according to its current phase.</summary>
     private void RainbowPickDirection(ref (int x, int y) cell, ref (int x, int y) targetCell,
         ref (int dx, int dy) direction, int eyeIndex)
     {
@@ -1668,6 +1716,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         targetCell = (cellX + bestDirection.dx, cellY + bestDirection.dy);
     }
 
+    /// <summary>Finds the closest other rainbow entity's maze cell.</summary>
     private (int x, int y) RainbowNearestSiblingCell(int eyeIndex)
     {
         var currentCell = eyeIndex == 0 ? RainbowMainCell : RainbowCloneCells[eyeIndex - 1];
@@ -1695,6 +1744,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return nearestCell;
     }
 
+    /// <summary>Checks traversability under the rainbow ghost's movement rules.</summary>
     private bool RainbowCanMove(int cellX, int cellY, int directionX, int directionY)
     {
         if (!Maze.CanMove(cellX, cellY, directionX, directionY)) return false;
@@ -1707,6 +1757,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return true;
     }
 
+    /// <summary>Tests the rainbow ghost's time and collectible release thresholds.</summary>
     private bool RainbowIsReleased()
     {
         if (RainbowMainRespawnTimer > 0f) return false;
@@ -1723,6 +1774,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return false;
     }
 
+    /// <summary>Advances the stored eye positions used by rainbow rendering.</summary>
     private void RainbowShiftEyeHistory()
     {
         RainbowEyePositions[0] = RainbowPreviousPositions[0];
@@ -1737,6 +1789,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Updates the main rainbow entity's animated material color.</summary>
     private void RainbowUpdateMainColor()
     {
         var color = LightFactory.HueToRGB(RainbowMainHue);
@@ -1745,6 +1798,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         material.Emissive = color;
     }
 
+    /// <summary>Updates a rainbow clone's animated material color.</summary>
     private void RainbowUpdateCloneColor(int cloneIndex)
     {
         var color = LightFactory.HueToRGB(RainbowMainHue);
@@ -1753,6 +1807,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         material.Emissive = color;
     }
 
+    /// <summary>Returns the scatter corner associated with a rainbow eye index.</summary>
     private (int x, int y) RainbowGetCorner(int eyeIndex) => (eyeIndex % 4) switch
     {
         0 => (2, 1),
@@ -1761,6 +1816,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         _ => (Maze.Columns - 1, Maze.Rows - 2),
     };
 
+    /// <summary>Chooses a traversable target cell for rainbow movement.</summary>
     private (int x, int y) RainbowPickRandomWalkable()
     {
         for (int attempt = 0; attempt < 100; attempt++)
@@ -1774,6 +1830,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         return (Maze.Columns / 2, 0);
     }
 
+    /// <inheritdoc/>
     public override void LateRender()
     {
         if (Geometry.IsDebugHidingGameplay) return;
@@ -1781,6 +1838,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
         DrawGhostEyes();
     }
 
+    /// <summary>Projects and draws ghost-eye overlays in display coordinates.</summary>
     void DrawGhostEyes()
     {
         int regularGhostCount = GhostCount;

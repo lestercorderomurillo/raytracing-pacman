@@ -6,6 +6,7 @@ using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
+/// <summary>Builds maze entities and tracks walls, collectibles, and movement constraints.</summary>
 [SystemTag("Pacman")]
 public class PacmanMazeBuilder : com.radiant.engine.core.System
 {
@@ -34,6 +35,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
 
     private bool[,] Grid;
 
+    /// <summary>Finds the maze section containing a tile for section-based wall colors.</summary>
     private int GetSection(int cellX, int cellY)
     {
         if (Sections == null || cellY < 0 || cellY >= Rows || cellX < 0 || cellX >= Columns) return 0;
@@ -45,6 +47,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return 0;
     }
 
+    /// <summary>Returns the configured wall color for the tile's maze section.</summary>
     public Color GetWallColor(int cellX, int cellY)
     {
         if (WallColors == null || WallColors.Length == 0) return WallLight;
@@ -53,6 +56,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return WallColors[section % WallColors.Length];
     }
 
+    /// <summary>Reports whether a cell blocks normal maze movement.</summary>
     public bool IsWall(int cellX, int cellY)
     {
         if (cellX < 0 || cellX >= Columns || cellY < 0 || cellY >= Rows) return true;
@@ -60,6 +64,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return Grid[cellX, cellY];
     }
 
+    /// <summary>Checks whether a step from a cell reaches a traversable maze tile.</summary>
     public bool CanMove(int cellX, int cellY, int directionX, int directionY)
     {
         int nextCellX = cellX + directionX, nextCellY = cellY + directionY;
@@ -72,6 +77,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return !Grid[nextCellX, nextCellY];
     }
 
+    /// <summary>Wraps horizontal cell coordinates through the maze's side tunnels.</summary>
     public int WrapX(int cellX)
     {
         if (cellX < 0) return cellX + Columns;
@@ -84,15 +90,18 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
     public int HouseDoorLeft => (GhostHouse.left + GhostHouse.right) / 2;
     public int HouseDoorRight => HouseDoorLeft + 1;
 
+    /// <summary>Reports whether a cell belongs to the ghost-house interior.</summary>
     public bool InGhostHouse(int cellX, int cellY)
     {
         var (left, top, right, bottom) = GhostHouse;
         return left >= 0 && cellX >= left && cellX <= right && cellY >= top && cellY <= bottom;
     }
 
+    /// <summary>Reports whether a cell is part of the ghost-house doorway.</summary>
     public bool IsGhostDoor(int cellX, int cellY) =>
         GhostHouse.left >= 0 && cellY == HouseDoorY && cellX >= HouseDoorLeft && cellX <= HouseDoorRight;
 
+    /// <summary>Reports whether regular ghost movement forbids an upward turn at this cell.</summary>
     public bool IsNoUpTile(int cellX, int cellY)
     {
         if (NoUpTiles == null) return false;
@@ -104,10 +113,12 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return false;
     }
 
+    /// <summary>Converts maze-cell coordinates to the cell's world-space center.</summary>
     public Vector2 CellCenter(int cellX, int cellY) => new(
         OffsetX + cellX * CellSize + CellSize / 2f,
         OffsetY + cellY * CellSize + CellSize / 2f);
 
+    /// <summary>Creates coin entities on eligible tiles, optionally excluding one cell.</summary>
     public int[] SpawnCoins(float radius, Color emissive, float depth, (int x, int y)? exclude = null)
     {
         var entities = Scene.ECS;
@@ -139,6 +150,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return entityIds;
     }
 
+    /// <summary>Removes a coin from the requested cell and reports whether one was collected.</summary>
     public bool TryCollectCoin(int cellX, int cellY)
     {
         if (!CoinCells.Remove((cellX, cellY), out int entityId)) return false;
@@ -147,6 +159,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return true;
     }
 
+    /// <summary>Destroys collectible entities and clears their cell lookups.</summary>
     public void ClearCoins()
     {
         var entities = Scene.ECS;
@@ -162,6 +175,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         PowerPelletCells.Clear();
     }
 
+    /// <summary>Creates power-pellet entities at the requested maze cells.</summary>
     public void SpawnPowerPellets((int x, int y)[] positions, float radius, Color color, float depth)
     {
         var entities = Scene.ECS;
@@ -179,6 +193,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Removes a power pellet from the cell and reports whether one was collected.</summary>
     public bool TryCollectPowerPellet(int cellX, int cellY)
     {
         if (!PowerPelletCells.Remove((cellX, cellY), out int entityId)) return false;
@@ -187,6 +202,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return true;
     }
 
+    /// <summary>Finds walkable cells near the maze corners for power-pellet placement.</summary>
     public (int x, int y)[] FindCornerPelletPositions()
     {
         var corners = new (int tx, int ty)[]
@@ -224,6 +240,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return pelletPositions;
     }
 
+    /// <summary>Creates colored character entities at the supplied maze-cell positions.</summary>
     public int[] SpawnAtCells((int x, int y)[] cells, Color[] colors, float radius, float depth,
         Texture2D texture = null)
     {
@@ -240,6 +257,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
         return entityIds;
     }
 
+    /// <summary>Creates wall geometry and movement lookups from the active level layout.</summary>
     public void BuildMaze()
     {
         Columns = Layout[0].Length;
@@ -258,6 +276,7 @@ public class PacmanMazeBuilder : com.radiant.engine.core.System
                 Grid[cellX, cellY] = Layout[cellY][cellX] == '1';
     }
 
+    /// <summary>Destroys generated maze entities and resets cached layout data.</summary>
     public void ClearMaze()
     {
         Grid = null;

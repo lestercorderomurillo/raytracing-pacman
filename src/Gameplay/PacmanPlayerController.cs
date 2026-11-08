@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
+/// <summary>Moves Pac-Man through the maze, collects items, and draws character overlays.</summary>
 [Pausable(PauseGroup.Gameplay | PauseGroup.Animation)]
 [RunAfter(typeof(PacmanMazeBuilder))]
 [RunBefore(typeof(PacmanGhostAI))]
@@ -61,6 +62,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
     Vector2 PreviousRenderPosition;
     float IdleTime;
 
+    /// <summary>Attaches player control to an entity and resets its starting cell and depth.</summary>
     public void Track(int entityId, (int x, int y) startCell, float depth)
     {
         EntityId = entityId;
@@ -91,6 +93,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         material.Texture = PlayerRenderTarget;
     }
 
+    /// <summary>Clears the tracked player and its movement state.</summary>
     public void Clear()
     {
         if (!IsTracked) return;
@@ -101,6 +104,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         CoinsTotal = 0;
     }
 
+    /// <summary>Hides player geometry during death or scene transitions.</summary>
     public void HidePlayer()
     {
         if (PlayerHidden || !IsTracked || !Scene.ECS.IsAlive(EntityId)) return;
@@ -114,6 +118,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         PlayerHidden = true;
     }
 
+    /// <summary>Restores the tracked player's visibility.</summary>
     public void ShowPlayer()
     {
         if (!PlayerHidden || !IsTracked || !Scene.ECS.IsAlive(EntityId)) return;
@@ -124,6 +129,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         PlayerHidden = false;
     }
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
@@ -135,6 +141,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         PlayerRenderTarget = Renderer.CreateRenderTarget(RenderTargetSize, RenderTargetSize);
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
         if (Maze == null || !IsTracked) return;
@@ -245,6 +252,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         RenderPlayerTexture();
     }
 
+    /// <summary>Updates the player's requested turn from the current keyboard state.</summary>
     void ReadInput(KeyboardState keyboardState)
     {
         (int dx, int dy) desiredDirection = (0, 0);
@@ -274,6 +282,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         }
     }
 
+    /// <summary>Collects coins or power pellets at the player's current cell.</summary>
     void CollectAt(int cellX, int cellY)
     {
         if (Maze.TryCollectCoin(cellX, cellY))
@@ -290,6 +299,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         }
     }
 
+    /// <inheritdoc/>
     public override void LateRender()
     {
         if (Geometry.IsDebugHidingGameplay) return;
@@ -298,6 +308,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         DrawPlayerEyes();
     }
 
+    /// <summary>Draws the animated Pac-Man body into its cached texture.</summary>
     void RenderPlayerTexture()
     {
         if (PlayerRenderTarget == null || !IsTracked) return;
@@ -321,6 +332,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         Renderer.PopTargets();
     }
 
+    /// <summary>Draws player-eye overlays aligned with the projected character.</summary>
     void DrawPlayerEyes()
     {
         if (!IsTracked) return;
@@ -360,6 +372,7 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         Renderer.EndDraw();
     }
 
+    /// <summary>Creates the reusable mouth-mask texture through the renderer.</summary>
     Texture2D CreateMouthTexture(int size)
     {
         var texture = Renderer.CreateTexture(size, size, SurfaceFormat.Color);

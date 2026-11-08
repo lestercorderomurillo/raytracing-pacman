@@ -5,11 +5,13 @@ using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework;
 using RaytracingPacman;
 
+/// <summary>Captures a validated game frame at the requested display resolution.</summary>
 sealed class GameplayCaptureWindow : Window
 {
     private readonly PacmanMazeLevelScene scene = new();
     private int frame;
 
+    /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public GameplayCaptureWindow() : base(new GameLoop(), new() { Title = "Pac-Man gameplay capture", Width = 2880, Height = 1521 })
     {
         GameLoop.AddScene(scene);
@@ -17,6 +19,7 @@ sealed class GameplayCaptureWindow : Window
         GameLoop.SetTargetFps(0);
     }
 
+    /// <inheritdoc/>
     protected override void Draw(GameTime gameTime)
     {
         base.Draw(gameTime);

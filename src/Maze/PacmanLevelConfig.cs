@@ -2,10 +2,14 @@ using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
+/// <summary>Ghost personalities used to select targeting behavior and appearance.</summary>
 public enum PacmanGhostType : byte { Blinky, Pinky, Inky, Clyde, Dinky, Shadow, Rainbow }
+/// <summary>Regular ghost behavior states for chasing, scattering, and frightened movement.</summary>
 public enum PacmanGhostMode : byte { Scatter, Chase, Frightened }
+/// <summary>Behavior phases of the rainbow ghost and its clones.</summary>
 public enum RainbowPhase : byte { Solo, Duo, Trio, Merging }
 
+/// <summary>Ghost personality, appearance, and release settings for a level.</summary>
 public struct GhostEntry
 {
     public PacmanGhostType Type;
@@ -14,6 +18,7 @@ public struct GhostEntry
     public float ReleaseAtCoinPercent;
 }
 
+/// <summary>Maze, character, collectible, and lighting settings for one level.</summary>
 public class PacmanLevelConfig
 {
     public string Tag { get; set; } = "1-1";

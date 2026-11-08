@@ -7,6 +7,7 @@ using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
+/// <summary>Connects maze gameplay, lighting, level selection, and inspector controls.</summary>
 public class PacmanMazeLevelScene : Scene
 {
     private HRCGI Lighting;
@@ -177,6 +178,7 @@ public class PacmanMazeLevelScene : Scene
         },
     ];
 
+    /// <inheritdoc/>
     public override void SetupECS()
     {
         UDRQuality.Set(1);
@@ -208,6 +210,7 @@ public class PacmanMazeLevelScene : Scene
         base.SetupECS();
     }
 
+    /// <inheritdoc/>
     public override void SetupScene()
     {
         Maze = ECS.GetSystem<PacmanMazeBuilder>();
@@ -264,12 +267,14 @@ public class PacmanMazeLevelScene : Scene
         base.SetupScene();
     }
 
+    /// <summary>Applies the selected gameplay and animation pause mode.</summary>
     private void ApplyPause(bool paused, int pauseType)
     {
         ECS.GameplayPaused = paused;
         ECS.AnimationPaused = paused && pauseType == 1;
     }
 
+    /// <summary>Reloads the current level and resets its gameplay state.</summary>
     private void RestartLevel()
     {
         ECS.DestroyAllEntities();
@@ -283,6 +288,7 @@ public class PacmanMazeLevelScene : Scene
         LoadLevel(CurrentLevel);
     }
 
+    /// <summary>Rebuilds the selected maze, characters, collectibles, and camera framing.</summary>
     private void LoadLevel(int levelIndex)
     {
         ECS.GetSystem<UDR4>()?.ResetHistory();
@@ -397,6 +403,7 @@ public class PacmanMazeLevelScene : Scene
         GhostAI.Player = PlayerController;
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
         bool ghostEnabled = GhostAI.Enabled;
@@ -535,6 +542,7 @@ public class PacmanMazeLevelScene : Scene
         Inspector.SetLabel("scene", "level", $"Level: {CurrentLevel + 1}/{Levels.Length}");
     }
 
+    /// <summary>Routes the active lighting output into the selected reconstruction stage.</summary>
     private void UpdateUpscalerInput()
     {
         Tonemapper.SetInputSource(Lighting.GetOutput);
@@ -553,6 +561,7 @@ public class PacmanMazeLevelScene : Scene
         });
     }
 
+    /// <summary>Enables or bypasses reconstruction and updates dependent rendering state.</summary>
     private void SetUpscalerEnabled(bool enabled)
     {
         if (enabled)
@@ -571,6 +580,7 @@ public class PacmanMazeLevelScene : Scene
         UpdateWindowVisibility();
     }
 
+    /// <summary>Synchronizes game settings windows with the current rendering selections.</summary>
     private void UpdateWindowVisibility()
     {
         string[] upscalerWindows = ["udr1", "udr2", "udr3", "udr4"];

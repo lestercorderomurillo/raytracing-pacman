@@ -21,6 +21,7 @@ public static class PacmanMazeGenerator
     private const int Down = 2;
     private const int Left = 3;
 
+    /// <summary>Builds a symmetric 28-by-31 maze; a nonnegative seed makes generation repeatable.</summary>
     public static string[] Generate(int seed = -1)
     {
         var randomGenerator = seed >= 0 ? new Random(seed) : new Random();
@@ -35,6 +36,7 @@ public static class PacmanMazeGenerator
         return FallbackLayout();
     }
 
+    /// <summary>Coarse maze cell with piece connections and final scaled coordinates.</summary>
     private sealed class Cell
     {
         public int Column, Row;
@@ -51,6 +53,7 @@ public static class PacmanMazeGenerator
         public int FinalColumn, FinalRow, FinalWidth, FinalHeight;
     }
 
+    /// <summary>Constructs one candidate maze from connected pieces and validates its layout.</summary>
     private sealed class MazeBuilder
     {
         private readonly Random RandomGenerator;
@@ -58,8 +61,10 @@ public static class PacmanMazeGenerator
         private readonly int[] TallRows = new int[CellColumnCount];
         private readonly int[] NarrowColumns = new int[CellRowCount];
 
+        /// <summary>Uses the supplied random source for repeatable maze construction.</summary>
         public MazeBuilder(Random randomGenerator) { this.RandomGenerator = randomGenerator; }
 
+        /// <summary>Returns a valid candidate layout, or null when piece or tunnel constraints fail.</summary>
         public string[] Build()
         {
             Reset();
@@ -73,6 +78,7 @@ public static class PacmanMazeGenerator
             return GetTiles();
         }
 
+        /// <summary>Randomizes a list in place using the generator's seeded random source.</summary>
         private void Shuffle<T>(List<T> items)
         {
             for (int itemIndex = items.Count - 1; itemIndex > 0; itemIndex--)
@@ -82,11 +88,13 @@ public static class PacmanMazeGenerator
             }
         }
 
+        /// <summary>Chooses a random candidate, or returns null when the list is empty.</summary>
         private Cell RandomElement(List<Cell> candidates)
         {
             return candidates.Count == 0 ? null : candidates[RandomGenerator.Next(candidates.Count)];
         }
 
+        /// <summary>Recreates the coarse cell grid and reserves the ghost-house region.</summary>
         private void Reset()
         {
             for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
@@ -129,6 +137,7 @@ public static class PacmanMazeGenerator
                 NarrowColumns[cellIndex] = CellColumnCount;
         }
 
+        /// <summary>Finds unfilled candidates in the leftmost unfinished cell column.</summary>
         private List<Cell> GetLeftMostEmpty()
         {
             var emptyCells = new List<Cell>();
@@ -147,6 +156,7 @@ public static class PacmanMazeGenerator
             return emptyCells;
         }
 
+        /// <summary>Checks whether a neighboring cell can extend the current maze piece.</summary>
         private bool IsOpenCell(Cell cell, int direction, int previousDirection = -1, int pieceSize = -1)
         {
             if (cell.Row == 6 && cell.Column == 0 && direction == Down) return false;
@@ -165,6 +175,7 @@ public static class PacmanMazeGenerator
             return false;
         }
 
+        /// <summary>Lists valid directions in which the current maze piece can grow.</summary>
         private List<int> GetOpenDirections(Cell cell, int previousDirection, int pieceSize)
         {
             var openDirections = new List<int>();
@@ -175,6 +186,7 @@ public static class PacmanMazeGenerator
             return openDirections;
         }
 
+        /// <summary>Links neighboring cells in the selected direction.</summary>
         private void ConnectCell(Cell cell, int direction)
         {
             cell.Connections[direction] = true;
@@ -182,12 +194,14 @@ public static class PacmanMazeGenerator
             if (cell.Column == 0 && direction == Right) cell.Connections[Left] = true;
         }
 
+        /// <summary>Assigns a cell to the current generated piece.</summary>
         private void FillCell(Cell cell, int groupIndex)
         {
             cell.Filled = true;
             cell.GroupIndex = groupIndex;
         }
 
+        /// <summary>Returns the probability of ending a piece at its current size.</summary>
         private static double StopProbability(int pieceSize) => pieceSize switch
         {
             <= 1 => 0,
@@ -197,6 +211,7 @@ public static class PacmanMazeGenerator
             _ => 1
         };
 
+        /// <summary>Fills the coarse maze grid with connected wall pieces.</summary>
         private void GeneratePieces()
         {
             int groupCount = 0;
@@ -345,6 +360,7 @@ public static class PacmanMazeGenerator
             SetResizeCandidates();
         }
 
+        /// <summary>Marks cells that can be stretched or narrowed during layout scaling.</summary>
         private void SetResizeCandidates()
         {
             for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
@@ -373,9 +389,11 @@ public static class PacmanMazeGenerator
             }
         }
 
+        /// <summary>Reports whether a coarse cell has connections in all four directions.</summary>
         private static bool IsCross(Cell cell) =>
             cell.Connections[Up] && cell.Connections[Right] && cell.Connections[Down] && cell.Connections[Left];
 
+        /// <summary>Tests the local piece arrangement for a horizontal resizing pattern.</summary>
         private bool IsHorizontalPiece(int column, int row)
         {
             var firstConnections = Cells[column + row * CellColumnCount].Connections;
@@ -384,6 +402,7 @@ public static class PacmanMazeGenerator
                    !neighborConnections[Up] && !neighborConnections[Down] && neighborConnections[Left] && !neighborConnections[Right];
         }
 
+        /// <summary>Tests the local piece arrangement for a vertical resizing pattern.</summary>
         private bool IsVerticalPiece(int column, int row)
         {
             var firstConnections = Cells[column + row * CellColumnCount].Connections;
@@ -395,6 +414,7 @@ public static class PacmanMazeGenerator
                    !neighborConnections[Left] && !neighborConnections[Right] && neighborConnections[Up] && !neighborConnections[Down];
         }
 
+        /// <summary>Validates piece shapes and chooses a compatible scaling layout.</summary>
         private bool IsDesirable()
         {
             // Solid corners
@@ -429,6 +449,7 @@ public static class PacmanMazeGenerator
             return true;
         }
 
+        /// <summary>Selects rows that can be stretched without invalidating maze topology.</summary>
         private bool ChooseTallRows()
         {
             for (int row = 0; row < 3; row++)
@@ -446,6 +467,7 @@ public static class PacmanMazeGenerator
             return false;
         }
 
+        /// <summary>Checks whether the candidate cell permits a taller layout row.</summary>
         private bool CanRaiseHeight(int column, int row)
         {
             if (column == CellColumnCount - 1) return true;
@@ -485,6 +507,7 @@ public static class PacmanMazeGenerator
             return false;
         }
 
+        /// <summary>Selects columns that can be narrowed while preserving passages.</summary>
         private bool ChooseNarrowColumns()
         {
             for (int column = CellColumnCount - 1; column >= 0; column--)
@@ -502,6 +525,7 @@ public static class PacmanMazeGenerator
             return false;
         }
 
+        /// <summary>Checks whether the candidate cell permits a narrower layout column.</summary>
         private bool CanShrinkWidth(int column, int row)
         {
             if (row == CellRowCount - 1) return true;
@@ -541,6 +565,7 @@ public static class PacmanMazeGenerator
             return false;
         }
 
+        /// <summary>Calculates final tile coordinates and dimensions for each coarse cell.</summary>
         private void SetUpScaledCoordinates()
         {
             for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
@@ -553,6 +578,7 @@ public static class PacmanMazeGenerator
             }
         }
 
+        /// <summary>Connects compatible wall pieces along the scaled layout boundaries.</summary>
         private void JoinWalls()
         {
             // Join to top boundary
@@ -617,6 +643,7 @@ public static class PacmanMazeGenerator
             }
         }
 
+        /// <summary>Chooses and connects side tunnels, rejecting incompatible layouts.</summary>
         private bool CreateTunnels()
         {
             var singleDeadEnds = new List<Cell>();
@@ -752,6 +779,7 @@ public static class PacmanMazeGenerator
             return true;
         }
 
+        /// <summary>Marks a dead-end cell for tunnel construction.</summary>
         private void SelectSingleDeadEnd(Cell cell)
         {
             cell.Connections[Right] = true;
@@ -759,12 +787,14 @@ public static class PacmanMazeGenerator
             else cell.Neighbors[Down].TopTunnel = true;
         }
 
+        /// <summary>Merges piece identifiers after connected walls join their groups.</summary>
         private void ReplaceGroup(int oldGroup, int newGroup)
         {
             for (int cellIndex = 0; cellIndex < CellRowCount * CellColumnCount; cellIndex++)
                 if (Cells[cellIndex].GroupIndex == oldGroup) Cells[cellIndex].GroupIndex = newGroup;
         }
 
+        /// <summary>Rasterizes and mirrors the coarse layout into the final maze tile rows.</summary>
         private string[] GetTiles()
         {
             var tiles = new char[TileRowCount * FullColumnCount];
@@ -926,6 +956,7 @@ public static class PacmanMazeGenerator
         }
     }
 
+    /// <summary>Returns the fixed maze used when procedural attempts cannot produce a valid layout.</summary>
     private static string[] FallbackLayout() =>
     [
         "1111111111111111111111111111",

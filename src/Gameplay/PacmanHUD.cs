@@ -6,6 +6,7 @@ using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
+/// <summary>Draws score and game status relative to the projected maze bounds.</summary>
 [RunAfter(typeof(PacmanPlayerController))]
 [SystemTag("Pacman")]
 public class PacmanHUD : com.radiant.engine.core.System
@@ -18,6 +19,7 @@ public class PacmanHUD : com.radiant.engine.core.System
 
     const string HudFontName = "PressStart2P";
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Player = Scene.ECS.GetSystem<PacmanPlayerController>();
@@ -25,6 +27,7 @@ public class PacmanHUD : com.radiant.engine.core.System
         Geometry = Scene.ECS.GetSystem<Geometry>();
     }
 
+    /// <inheritdoc/>
     public override void LateRender()
     {
         if (Player == null || !Player.IsTracked || Geometry.IsDebugHidingGameplay) return;

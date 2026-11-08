@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RadiantRoot Condition="'$(RadiantRoot)' == ''">$(MSBuildProjectDirectory)/../radiant-game-engine</RadiantRoot>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Keep field/property documentation optional; validate all XML comments. -->
+    <NoWarn>$(NoWarn);1591</NoWarn>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>

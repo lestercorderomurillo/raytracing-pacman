@@ -6,6 +6,7 @@ using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
+/// <summary>Caches maze color and emission targets for the HRC pipeline.</summary>
 [RunAfter(typeof(PacmanMazeBuilder))]
 [RunBefore(typeof(Geometry))]
 [SystemTag("Pacman")]
@@ -16,12 +17,14 @@ public class PacmanMazeRenderer : com.radiant.engine.core.System
     private PacmanMazeBuilder Maze;
     private Geometry Geometry;
 
+    /// <inheritdoc/>
     public override void Initialize()
     {
         Maze = Scene.ECS.GetSystem<PacmanMazeBuilder>();
         Geometry = Scene.ECS.GetSystem<Geometry>();
     }
 
+    /// <summary>Rebuilds the cached maze color and emission images.</summary>
     public void RenderMaze()
     {
         if (Maze == null || !Maze.HasGrid) return;
@@ -29,6 +32,7 @@ public class PacmanMazeRenderer : com.radiant.engine.core.System
         DrawMazeToRenderTargets();
     }
 
+    /// <summary>Clears cached maze images before the next rendering pass.</summary>
     public void ClearRenderTargets()
     {
         MazeEmissiveTarget?.Dispose();
@@ -38,6 +42,7 @@ public class PacmanMazeRenderer : com.radiant.engine.core.System
         MazeAbsorptionTarget = null;
     }
 
+    /// <inheritdoc/>
     public override void Update()
     {
         if (Geometry == null) return;
@@ -47,16 +52,19 @@ public class PacmanMazeRenderer : com.radiant.engine.core.System
         Geometry.BackgroundAbsorption = MazeAbsorptionTarget;
     }
 
+    /// <inheritdoc/>
     public override void OnResize()
     {
         if (Maze != null && Maze.HasGrid) DrawMazeToRenderTargets();
     }
 
+    /// <inheritdoc/>
     public override void Dispose()
     {
         ClearRenderTargets();
     }
 
+    /// <summary>Draws walls and emissive borders into the maze's cached targets.</summary>
     private void DrawMazeToRenderTargets()
     {
         MazeEmissiveTarget?.Dispose();
