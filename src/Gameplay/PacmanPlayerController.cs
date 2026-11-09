@@ -2,8 +2,7 @@ using System;
 using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
-using Microsoft.Xna.Framework;
+using com.radiant.engine.input;
 
 namespace RaytracingPacman;
 
@@ -150,10 +149,10 @@ public class PacmanPlayerController : com.radiant.engine.core.System
         RenderPosition = PreviousRenderPosition;
         PreviousRenderPosition = WorldPosition;
 
-        var keyboardState = Keyboard.GetState();
+        var keyboardState = Controls.Keyboard;
         ReadInput(keyboardState);
 
-        float deltaTime = (float)GameTime.ElapsedGameTime.TotalSeconds;
+        float deltaTime = Time.DeltaSeconds;
         float moveDistance = Speed * deltaTime;
 
         if (!Scene.ECS.IsAlive(EntityId)) return;
@@ -257,10 +256,10 @@ public class PacmanPlayerController : com.radiant.engine.core.System
     {
         (int dx, int dy) desiredDirection = (0, 0);
 
-        if (keyboardState.IsKeyDown(Keys.Up)) desiredDirection = (0, -1);
-        else if (keyboardState.IsKeyDown(Keys.Left)) desiredDirection = (-1, 0);
-        else if (keyboardState.IsKeyDown(Keys.Down)) desiredDirection = (0, 1);
-        else if (keyboardState.IsKeyDown(Keys.Right)) desiredDirection = (1, 0);
+        if (keyboardState.IsKeyDown(Key.Up)) desiredDirection = (0, -1);
+        else if (keyboardState.IsKeyDown(Key.Left)) desiredDirection = (-1, 0);
+        else if (keyboardState.IsKeyDown(Key.Down)) desiredDirection = (0, 1);
+        else if (keyboardState.IsKeyDown(Key.Right)) desiredDirection = (1, 0);
 
         if (desiredDirection == (0, 0)) return;
 

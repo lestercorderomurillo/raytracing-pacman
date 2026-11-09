@@ -3,7 +3,6 @@ using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 using com.radiant.engine.runtime;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
@@ -444,7 +443,7 @@ public class PacmanMazeLevelScene : Scene
 
         if (ECS.AnimationPaused) return;
 
-        CoinWaveTime += (float)GameTime.ElapsedGameTime.TotalSeconds;
+        CoinWaveTime += Time.DeltaSeconds;
         var playerPosition = PlayerController.WorldPosition;
         const float attractRadius = 200f;
         const float attractStrength = 0.25f;

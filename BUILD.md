@@ -16,7 +16,7 @@ git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
 cd raytracing-pacman
 ```
 
-Use [Radiant v0.2.0](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.2.0) for the `Transform2D` ECS API and UDR4 renderer. Pac-Man v0.2.0 is paired with that engine release. Keep both checkouts on compatible revisions.
+The current game sources require [Radiant v0.3.0](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.0) with `FrameTime`, input snapshots, System.Numerics math and Radiant color/render-state types. Historical Pac-Man v0.2.0 remains paired with Radiant v0.2.0; do not mix the current game sources with that older engine API. Keep both checkouts on compatible revisions.
 
 ## Build and run
 
@@ -96,3 +96,21 @@ To refresh the unedited 2880×1521 gameplay capture, run the test harness with `
 ## Shared camera controller
 
 With Radiant v0.2.1, open F1 > ECS > Open Camera Controls, or use the Camera controls button in the game settings. The single window searches camera IDs/types and selects instances independently of the entity inspector. This game uses the fitted 2D World view: enable Navigate camera and hold RMB with WASD to pan, or use Zoom in / Zoom out. Adjust movement speed for world units. Closing the controller stops navigation. Changing levels restores the game framing where the scene calls FitWorld.
+
+## Radiant API migration checks
+
+Gameplay uses `Time.DeltaSeconds` and `Controls.Keyboard`. `src/RadiantTypes.cs`
+selects public .NET/Radiant types and is linked into the test project; it does not
+reference the engine's internal compilation aliases. Native texture readback stays
+inside the graphics test harness.
+
+Run the input regression on an isolated display:
+
+```sh
+xvfb-run -a -s '-screen 0 1600x1200x24 -extension MIT-SHM' dotnet tests/Pacman.Tests/bin/Release/net8.0/Pacman.Tests.dll --input
+```
+
+This checks actual player movement from Radiant keyboard snapshots. Run `--graphics`
+and `--rendering` on the same isolated display setup. If the hardware Vulkan driver
+cannot present to Xvfb, set `VK_ICD_FILENAMES` to an installed software Vulkan ICD;
+those checks establish correctness, not hardware performance.

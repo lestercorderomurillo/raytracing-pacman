@@ -6,6 +6,7 @@
     <RollForward>Major</RollForward>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/RadiantTypes.cs" Link="RadiantTypes.cs" />
     <ProjectReference Include="../../raytracing-pacman.csproj" />
     <Compile Include="$(RadiantRoot)/tests/Shared/SmokeWindow.cs" Link="SmokeWindow.cs" />
   </ItemGroup>

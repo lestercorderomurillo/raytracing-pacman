@@ -2,7 +2,6 @@ using System;
 using com.radiant.engine.bundle;
 using com.radiant.engine.core;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework;
 
 namespace RaytracingPacman;
 
@@ -276,7 +275,7 @@ public class PacmanGhostAI : com.radiant.engine.core.System
     /// <inheritdoc/>
     public override void Update()
     {
-        float deltaTime = (float)GameTime.ElapsedGameTime.TotalSeconds;
+        float deltaTime = Time.DeltaSeconds;
         UpdateRegularGhosts(deltaTime);
         UpdateRainbowGhost(deltaTime);
     }

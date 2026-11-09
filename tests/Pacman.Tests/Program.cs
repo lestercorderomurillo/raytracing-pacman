@@ -103,3 +103,9 @@ static void ExerciseGame(Scene scene, int frameNumber)
         GetWidget("scene", "prevLevel").ButtonCallback();
     }
 }
+
+if (args.Contains("--input"))
+{
+    using var window = new InputRegressionWindow();
+    window.Run();
+}

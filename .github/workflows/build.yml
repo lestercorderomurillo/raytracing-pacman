@@ -6,7 +6,7 @@ on:
     inputs:
       engine_ref:
         description: Compatible Radiant branch, tag, or commit
-        default: main
+        default: v0.3.0
         type: string
 permissions:
   contents: read
@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: lestercorderomurillo/radiant-game-engine
-          ref: ${{ inputs.engine_ref || 'main' }}
+          ref: ${{ inputs.engine_ref || 'v0.3.0' }}
           path: radiant-game-engine
       - uses: actions/setup-dotnet@v4
         with:
