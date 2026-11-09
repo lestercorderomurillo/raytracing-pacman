@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using com.radiant.engine.bundle;
 using com.radiant.engine.core;
-using Microsoft.Xna.Framework.Graphics;
 
 namespace RaytracingPacman;
 

@@ -16,7 +16,7 @@ git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
 cd raytracing-pacman
 ```
 
-The current game sources require [Radiant v0.3.0](https://github.com/lestercorderomurillo/radiant-game-engine/releases/tag/v0.3.0) with `FrameTime`, input snapshots, System.Numerics math and Radiant color/render-state types. Historical Pac-Man v0.2.0 remains paired with Radiant v0.2.0; do not mix the current game sources with that older engine API. Keep both checkouts on compatible revisions.
+Current development sources require the matching Radiant checkout with `com.radiant.engine.graphics` texture, render-target and effect contracts (after v0.3.0). Pac-Man v0.3.0 remains paired with Radiant v0.3.0; Pac-Man v0.2.0 with Radiant v0.2.0. Keep both development checkouts on compatible revisions; released engine v0.3.0 cannot compile the new resource aliases.
 
 ## Build and run
 
@@ -114,3 +114,35 @@ This checks actual player movement from Radiant keyboard snapshots. Run `--graph
 and `--rendering` on the same isolated display setup. If the hardware Vulkan driver
 cannot present to Xvfb, set `VK_ICD_FILENAMES` to an installed software Vulkan ICD;
 those checks establish correctness, not hardware performance.
+
+## Radiant graphics resources
+
+Gameplay uses Radiant textures and render targets through `src/RadiantTypes.cs`;
+resource creation stays in `Renderer`. Region readback uses Radiant rectangles.
+The engine owns native conversion and cached resources. See the engine's
+[resource contracts](../radiant-game-engine/docs/GraphicsResources.md) for ownership
+and effect lifetime rules. Run `python ../radiant-game-engine/eng/check-consumers.py`
+to build the engine and both games together before the isolated graphical checks.
+
+## Renderer and window contracts
+
+Current sources also require Radiant's `IRenderer` and `IWindow` migration. Scene/ECS
+renderers and game drawing helpers consume that interface; native MonoGame window
+subclasses remain confined to graphical test harnesses. Fluent calls still work, and
+window closure is `Renderer.Window.RequestClose()`. See the engine's
+[renderer contracts](../radiant-game-engine/docs/RendererContracts.md).
+
+The engine now delegates fitting, world/screen mapping and scaled metrics to its
+backend-independent `RenderView`. Game calls still use `IRenderer`. The `--graphics`
+check additionally compares sprite transforms with input coordinates and verifies
+scaled metrics after resizing; asset caches are tested through Radiant's injected
+`IGraphicsAssetLoader`.
+
+Fonts now use Radiant `FontFace`/`IFontLoader` contracts, and shape accumulation
+uses the shared CPU `ShapeCollection` before backend submission. Gameplay keeps
+using named `DrawString` and `IRenderer` shape commands. The graphics checks verify
+the game's HUD font metrics and repeated font lookup identity as well as rendering.
+
+Radiant now routes mesh and colored-triangle submission through `IGeometryBackend`.
+Game code continues to use `IRenderer.DrawMesh` / `DrawTriangles`; GPU buffer ownership
+and upload caching stay in the engine backend. Use the matching sibling engine checkout.

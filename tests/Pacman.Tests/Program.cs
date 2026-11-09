@@ -50,7 +50,11 @@ else if (args.Contains("--capture"))
 static void ExerciseGame(Scene scene, int frameNumber)
 {
     var maze = scene.ECS.GetSystem<PacmanMazeBuilder>();
-    var renderer = scene.Renderer;
+    IRenderer renderer = scene.Renderer;
+    var hudFont = renderer.GetFont("PressStart2P", 20);
+    if (hudFont.Measure("SCORE").X <= 0 || hudFont.LineHeight <= 0 ||
+        !ReferenceEquals(hudFont, renderer.GetFont("PressStart2P", 20)))
+        throw new Exception("Radiant HUD font metrics/cache failed.");
     var mazeCenter = new Vector2(maze.OffsetX + maze.Columns * maze.CellSize / 2f,
         maze.OffsetY + maze.Rows * maze.CellSize / 2f);
     if (Vector2.Distance(renderer.WorldToScreen(mazeCenter), renderer.ScreenSize / 2f) > 0.01f)
@@ -62,6 +66,13 @@ static void ExerciseGame(Scene scene, int frameNumber)
         throw new Exception("Window aspect ratio stretches maze cells.");
     if (Vector2.Distance(renderer.ScreenToWorld(renderer.WorldToScreen(mazeCenter)), mazeCenter) > 0.01f)
         throw new Exception("World-to-screen input mapping does not round-trip.");
+
+    var spritePosition = Vector2.Transform(mazeCenter, renderer.WorldTransform);
+    if (Vector2.Distance(spritePosition, renderer.WorldToScreen(mazeCenter)) > 0.01f)
+        throw new Exception("Sprite projection disagrees with the shared world view.");
+    if (renderer.ScaledWidth != Math.Max(1, (int)(renderer.ScreenWidth * renderer.RenderScale)) ||
+        renderer.ScaledHeight != Math.Max(1, (int)(renderer.ScreenHeight * renderer.RenderScale)))
+        throw new Exception("Scaled view metrics were not refreshed after resize.");
 
     // Invoke the actual inspector callbacks, independent of window placement/DPI.
     var inspectorSystem = scene.ECS.GetSystem<Inspector>();

@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radiant.Scenes", "..\radian
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radiant.Tests", "..\radiant-game-engine\tests\Radiant.Tests\Radiant.Tests.csproj", "{79A51E54-C47D-47A4-B08E-FF478053B1D0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radiant.Core", "..\radiant-game-engine\src\Radiant.Core\Radiant.Core.csproj", "{8A249122-76EB-45C3-A558-BF6FDA6CA632}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Radiant.Portable", "..\radiant-game-engine\tests\Radiant.Portable\Radiant.Portable.csproj", "{ECCD5325-4125-4091-B83C-3AB3C4F427CC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,6 +89,30 @@ Global
 		{79A51E54-C47D-47A4-B08E-FF478053B1D0}.Release|x64.Build.0 = Release|Any CPU
 		{79A51E54-C47D-47A4-B08E-FF478053B1D0}.Release|x86.ActiveCfg = Release|Any CPU
 		{79A51E54-C47D-47A4-B08E-FF478053B1D0}.Release|x86.Build.0 = Release|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Debug|x64.Build.0 = Debug|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Debug|x86.Build.0 = Debug|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Release|x64.ActiveCfg = Release|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Release|x64.Build.0 = Release|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Release|x86.ActiveCfg = Release|Any CPU
+		{8A249122-76EB-45C3-A558-BF6FDA6CA632}.Release|x86.Build.0 = Release|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Debug|x64.Build.0 = Debug|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Debug|x86.Build.0 = Debug|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Release|x64.ActiveCfg = Release|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Release|x64.Build.0 = Release|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Release|x86.ActiveCfg = Release|Any CPU
+		{ECCD5325-4125-4091-B83C-3AB3C4F427CC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

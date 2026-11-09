@@ -1,3 +1,4 @@
+using Window = com.radiant.engine.backends.monogame.MonoGameWindow;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -157,7 +158,7 @@ sealed class RenderingWindow : Window
         var wallCenter = Scene.Renderer.WorldToScreen(maze.CellCenter(1, 0));
         var absorption = new Color[1];
         geometry.AbsorptionTexture.GetData(0,
-            new Microsoft.Xna.Framework.Rectangle((int)wallCenter.X, (int)wallCenter.Y, 1, 1), absorption, 0, 1);
+            new Rectangle((int)wallCenter.X, (int)wallCenter.Y, 1, 1), absorption, 0, 1);
         if (absorption[0] != Color.White)
             throw new Exception($"Maze stopped blocking light on frame {Frame}, case {CaseIndex + 1}.");
     }
