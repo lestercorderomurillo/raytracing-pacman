@@ -51,6 +51,38 @@ jobs:
       - name: Publish Linux x64
         working-directory: raytracing-pacman
         run: dotnet publish "$GAME.csproj" -c Release -r linux-x64 --self-contained true -m:1 -o "../dist/$GAME"
+      - name: Check packaged startup on isolated software Vulkan
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb xdotool libvulkan1 mesa-vulkan-drivers
+          export SDL_VIDEODRIVER=x11
+          export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name '*lvp*' -print -quit)"
+          test -n "$VK_ICD_FILENAMES"
+          xvfb-run -a -s '-screen 0 1600x1200x24 -extension MIT-SHM' python3 - "$PWD/dist/$GAME/$GAME" <<'PYTHON'
+          import subprocess, sys, time
+          process = subprocess.Popen([sys.argv[1]], cwd='/tmp')
+          try:
+              deadline = time.monotonic() + 30
+              window = False
+              while time.monotonic() < deadline:
+                  assert process.poll() is None, 'Packaged game exited during startup'
+                  result = subprocess.run(['xdotool', 'search', '--onlyvisible', '--pid', str(process.pid)], capture_output=True)
+                  if result.returncode == 0:
+                      window = True
+                      break
+                  time.sleep(0.25)
+              assert window, 'No visible game window'
+              time.sleep(5)
+              assert process.poll() is None, 'Packaged game failed after opening its window'
+              print('PASS: self-contained game opens and remains running from another directory')
+          finally:
+              process.terminate()
+              try:
+                  process.wait(timeout=10)
+              except subprocess.TimeoutExpired:
+                  process.kill()
+                  process.wait()
+          PYTHON
       - name: Record provenance and archive
         env:
           TAG: ${{ inputs.tag }}
