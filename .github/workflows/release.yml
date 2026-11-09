@@ -1,0 +1,80 @@
+name: Package release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing draft release tag to package
+        required: true
+        default: v0.3.0
+        type: string
+      engine_tag:
+        description: Matching Radiant tag
+        required: true
+        default: v0.3.0
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: release-package-${{ inputs.tag }}
+  cancel-in-progress: false
+env:
+  GAME: raytracing-pacman
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+          path: raytracing-pacman
+      - uses: actions/checkout@v4
+        with:
+          repository: lestercorderomurillo/radiant-game-engine
+          ref: ${{ inputs.engine_tag }}
+          path: radiant-game-engine
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Validate release and refs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          ENGINE_TAG: ${{ inputs.engine_tag }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$ENGINE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+      - name: Build and test
+        working-directory: raytracing-pacman
+        run: dotnet run --project tests/Pacman.Tests -c Release
+      - name: Publish Linux x64
+        working-directory: raytracing-pacman
+        run: dotnet publish "$GAME.csproj" -c Release -r linux-x64 --self-contained true -m:1 -o "../dist/$GAME"
+      - name: Record provenance and archive
+        env:
+          TAG: ${{ inputs.tag }}
+          ENGINE_TAG: ${{ inputs.engine_tag }}
+        run: |
+          python3 - <<'PYTHON'
+          import os, json, subprocess
+          from pathlib import Path
+          game = os.environ['GAME']
+          commit = lambda folder: subprocess.check_output(['git', '-C', folder, 'rev-parse', 'HEAD'], text=True).strip()
+          manifest = {'version': os.environ['TAG'][1:], 'commit': commit(game),
+                      'engineVersion': os.environ['ENGINE_TAG'][1:], 'engineCommit': commit('radiant-game-engine'),
+                      'runtimeIdentifier': 'linux-x64', 'selfContained': True,
+                      'graphicsRuntime': 'MonoGame 3.8.6 stock Vulkan'}
+          (Path('dist') / game / 'release.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          PYTHON
+          mkdir -p assets
+          tar -C dist -czf "assets/$GAME-$TAG-linux-x64.tar.gz" "$GAME"
+          cd assets
+          sha256sum "$GAME-$TAG-linux-x64.tar.gz" > SHA256SUMS
+      - name: Upload to draft only
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          test "$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" = true
+          gh release upload "$TAG" "assets/$GAME-$TAG-linux-x64.tar.gz" assets/SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber
