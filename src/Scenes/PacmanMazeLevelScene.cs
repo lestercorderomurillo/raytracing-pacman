@@ -204,8 +204,6 @@ public class PacmanMazeLevelScene : Scene
         ECS.AddSystem<PacmanHUD>();
 
         Gizmos = ECS.AddSystem<GizmosRenderer>();
-
-        base.SetupECS();
     }
 
     /// <inheritdoc/>
@@ -261,8 +259,6 @@ public class PacmanMazeLevelScene : Scene
 
         Inspector.WindowsRestored += UpdateWindowVisibility;
         UpdateWindowVisibility();
-
-        base.SetupScene();
     }
 
     /// <summary>Applies the selected gameplay and animation pause mode.</summary>
