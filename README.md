@@ -1,7 +1,7 @@
 <h1 align="center">Raytracing Pac-Man</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.1"><img src="https://img.shields.io/badge/release-v0.1.1-E73C00?style=flat-square" alt="Release v0.1.1"></a>
+  <a href="https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.4.0"><img src="https://img.shields.io/badge/release-v0.4.0-E73C00?style=flat-square" alt="Release v0.4.0"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
 </p>
 
@@ -15,11 +15,11 @@ Collect every coin to advance. Power pellets let you eat frightened ghosts; gett
 
 ## Play
 
-**[Download v0.1.1 for Linux x64](https://github.com/lestercorderomurillo/raytracing-pacman/releases/download/v0.1.1/raytracing-pacman-v0.1.1-linux-x64.tar.gz)** · [Release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.1.1)
+**[Download v0.4.0 for Linux x64](https://github.com/lestercorderomurillo/raytracing-pacman/releases/download/v0.4.0/raytracing-pacman-v0.4.0-linux-x64.tar.gz)** · [Release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.4.0)
 
 ```sh
-tar -xzf raytracing-pacman-v0.1.1-linux-x64.tar.gz
-cd raytracing-pacman-v0.1.1-linux-x64
+tar -xzf raytracing-pacman-v0.4.0-linux-x64.tar.gz
+cd raytracing-pacman
 ./raytracing-pacman
 ```
 

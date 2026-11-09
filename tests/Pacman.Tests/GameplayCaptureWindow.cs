@@ -13,7 +13,7 @@ sealed class GameplayCaptureWindow : Window
     private int frame;
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
-    public GameplayCaptureWindow() : base(new GameLoop(), new() { Title = "Pac-Man gameplay capture", Width = 2880, Height = 1521 })
+    public GameplayCaptureWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Pac-Man gameplay capture", Width = 2880, Height = 1521 })
     {
         GameLoop.AddScene(scene);
         GameLoop.ThrottleUnfocused = false;

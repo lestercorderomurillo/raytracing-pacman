@@ -5,12 +5,12 @@ on:
       tag:
         description: Existing draft release tag to package
         required: true
-        default: v0.3.0
+        default: v0.4.0
         type: string
       engine_tag:
         description: Matching Radiant tag
         required: true
-        default: v0.3.0
+        default: v0.4.0
         type: string
 permissions:
   contents: write

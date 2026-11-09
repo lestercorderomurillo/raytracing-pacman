@@ -39,7 +39,7 @@ sealed class RenderingWindow : Window
 
     /// <summary>Creates the test fixture with the supplied scene or window configuration.</summary>
     public RenderingWindow()
-        : base(new GameLoop(), new() { Title = "Pac-Man rendering regression checks", Width = 1280, Height = 720 })
+        : base(new GameLoop(), new() { ShowLoader = false, Title = "Pac-Man rendering regression checks", Width = 1280, Height = 720 })
     {
         GameLoop.AddScene(Scene);
         GameLoop.ThrottleUnfocused = false;

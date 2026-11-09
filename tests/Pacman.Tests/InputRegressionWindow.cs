@@ -19,7 +19,7 @@ internal sealed class InputRegressionWindow : Window
     private Vector2 start;
     private Key moveKey;
 
-    public InputRegressionWindow() : base(new GameLoop(), new() { Title = "Game input regression", Width = 640, Height = 480 })
+    public InputRegressionWindow() : base(new GameLoop(), new() { ShowLoader = false, Title = "Game input regression", Width = 640, Height = 480 })
     {
         GameLoop.AddScene(scene);
         GameLoop.InputSource = input;

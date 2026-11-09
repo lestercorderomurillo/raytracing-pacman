@@ -16,7 +16,7 @@ git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
 cd raytracing-pacman
 ```
 
-Current development sources require the matching Radiant checkout with `com.radiant.engine.graphics` texture, render-target and effect contracts (after v0.3.0). Pac-Man v0.3.0 remains paired with Radiant v0.3.0; Pac-Man v0.2.0 with Radiant v0.2.0. Keep both development checkouts on compatible revisions; released engine v0.3.0 cannot compile the new resource aliases.
+Current sources require Radiant v0.4.0, including the portable graphics, renderer and window contracts. Use the matching engine tag for reproducible release builds.
 
 ## Build and run
 
