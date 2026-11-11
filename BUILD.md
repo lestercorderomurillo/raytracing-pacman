@@ -16,7 +16,7 @@ git clone https://github.com/lestercorderomurillo/raytracing-pacman.git
 cd raytracing-pacman
 ```
 
-Current sources require Radiant v0.4.0, including the portable graphics, renderer and window contracts. Use the matching engine tag for reproducible release builds.
+Current sources require Radiant v0.6.0, including the portable graphics, renderer and window contracts. Use the matching engine tag for reproducible release builds.
 
 ## Build and run
 

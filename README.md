@@ -1,7 +1,7 @@
 <h1 align="center">Raytracing Pac-Man</h1>
 
 <p align="center">
-  <a href="https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.4.0"><img src="https://img.shields.io/badge/release-v0.4.0-E73C00?style=flat-square" alt="Release v0.4.0"></a>
+  <a href="https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.5.0"><img src="https://img.shields.io/badge/release-v0.5.0-E73C00?style=flat-square" alt="Release v0.5.0"></a>
   <img src="https://img.shields.io/badge/Linux-Vulkan-8B5CF6?style=flat-square" alt="Linux with Vulkan">
 </p>
 
@@ -15,10 +15,10 @@ Collect every coin to advance. Power pellets let you eat frightened ghosts; gett
 
 ## Play
 
-**[Download v0.4.0 for Linux x64](https://github.com/lestercorderomurillo/raytracing-pacman/releases/download/v0.4.0/raytracing-pacman-v0.4.0-linux-x64.tar.gz)** · [Release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.4.0)
+**[Download v0.5.0 for Linux x64](https://github.com/lestercorderomurillo/raytracing-pacman/releases/download/v0.5.0/raytracing-pacman-v0.5.0-linux-x64.tar.gz)** · [Release notes](https://github.com/lestercorderomurillo/raytracing-pacman/releases/tag/v0.5.0)
 
 ```sh
-tar -xzf raytracing-pacman-v0.4.0-linux-x64.tar.gz
+tar -xzf raytracing-pacman-v0.5.0-linux-x64.tar.gz
 cd raytracing-pacman
 ./raytracing-pacman
 ```
@@ -59,3 +59,5 @@ Press **F1**, then choose **View → Show All** to display every editor panel.
 [![Editor with all panels visible](docs/screenshots/editor-show-all.png)](docs/screenshots/editor-show-all.png)
 
 [Build and test instructions](BUILD.md). Built with [Radiant](https://github.com/lestercorderomurillo/radiant-game-engine) and MonoGame DesktopVK.
+
+Press **F1**, then choose **View → Workspace Mode → Panels** for docked tools and a framed game view. Drag tabs to reorder or move them between docks; choose **Windows** to restore floating tools.

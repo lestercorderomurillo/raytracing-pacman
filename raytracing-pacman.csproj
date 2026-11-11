@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
     <RadiantRoot Condition="'$(RadiantRoot)' == ''">$(MSBuildProjectDirectory)/../radiant-game-engine</RadiantRoot>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <!-- Keep field/property documentation optional; validate all XML comments. -->
